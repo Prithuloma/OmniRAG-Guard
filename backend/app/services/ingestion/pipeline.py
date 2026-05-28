@@ -48,3 +48,12 @@ class IngestionPipeline:
         chunks = await self._chunker.chunk(document=parsed)
         return IngestionPipelineResult(validations=validations, parsed=parsed, chunks=chunks)
 
+    async def run(
+        self,
+        *,
+        filename: str,
+        content_type: str,
+        data: bytes,
+    ) -> IngestionPipelineResult:
+        return await self.ingest(filename=filename, content_type=content_type, data=data)
+

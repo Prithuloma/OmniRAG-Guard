@@ -14,8 +14,12 @@ class FileValidator:
     def __init__(
         self,
         *,
-        allowed_content_types: Iterable[str] = ("application/pdf", "image/png", "image/jpeg"),
-        max_bytes: int = 25 * 1024 * 1024,
+        allowed_content_types: Iterable[str] = (
+            "application/pdf",
+            "text/plain",
+            "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        ),
+        max_bytes: int = 50 * 1024 * 1024,
     ) -> None:
         self._allowed_content_types = set(allowed_content_types)
         self._max_bytes = max_bytes
