@@ -1,5 +1,6 @@
 # OmniRAG-Guard
 
+ feature/frontend-foundation
 Adaptive Multi-Modal RAG with Hallucination Verification and Cost-Aware Model Routing
 
 ## Overview
@@ -156,3 +157,26 @@ Setup instructions will be added as development progresses.
 # License
 
 MIT License
+=======
+## Goal
+Production-grade multimodal RAG system with:
+- hallucination verification
+- semantic evidence checking
+- adaptive retrieval
+- cost-aware routing
+
+## Stack
+Frontend: Next.js
+Backend: FastAPI
+Vector DB: Qdrant
+Orchestration: LangGraph
+
+## Current Status
+- Repository initialized
+- Local structure created
+
+## Conventions
+- feature branches only
+- PR before merge
+- modular architecture
+ main
