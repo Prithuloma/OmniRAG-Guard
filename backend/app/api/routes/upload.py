@@ -1,48 +1,39 @@
-from fastapi import APIRouter, File, Form, UploadFile, status
+"""
+upload.py
+---------
+Upload route — accepts multipart file, delegates to ingestion service.
+"""
 
-from app.models.request_models import UploadMetadata, UploadRequest
-from app.models.response_models import ErrorResponse, UploadResponse
-from app.services import IngestionService
+from __future__ import annotations
 
-router = APIRouter()
+from fastapi import APIRouter, HTTPException, UploadFile, status
+
+from app.services.ingestion.validation import FileValidationResult
+from app.services.ingestion_service import ingest_file
+
+router = APIRouter(prefix="/upload", tags=["Upload"])
 
 
 @router.post(
-    "/upload",
-    response_model=UploadResponse,
-    status_code=status.HTTP_202_ACCEPTED,
-    summary="Upload a document for ingestion",
-    responses={
-        415: {"model": ErrorResponse, "description": "Unsupported media type"},
-        413: {"model": ErrorResponse, "description": "File too large"},
-    },
-    tags=["Upload"],
+    "/",
+    response_model=FileValidationResult,
+    status_code=status.HTTP_200_OK,
+    summary="Upload a document or image for ingestion",
 )
-async def upload_document(
-    file: UploadFile = File(..., description="PDF, TXT, or DOCX file to ingest."),
-    title: str | None = Form(default=None, description="Optional document title."),
-    tags: str = Form(default="", description="Comma-separated tags, e.g. 'finance,q3'."),
-) -> UploadResponse:
+async def upload_file(file: UploadFile) -> FileValidationResult:
     """
-    Accept a document upload and enqueue it for the ingestion pipeline.
+    Upload endpoint.
 
-    Returns a stable `document_id` and an initial `status` of **pending**.
-    Poll `GET /documents/{document_id}` (future) to track pipeline progress.
-
-    > ⚠️ Ingestion logic is not yet implemented — mock response returned.
+    Validates the file and returns a structured result.
+    Returns HTTP 422 when validation fails so clients receive a consistent
+    error shape without a 500.
     """
-    contents = await file.read()
-    service = IngestionService()
+    result: FileValidationResult = await ingest_file(file)
 
-    request = UploadRequest(
-        metadata=UploadMetadata(
-            title=title,
-            tags=[t.strip() for t in tags.split(",") if t.strip()],
+    if not result.valid:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=result.error.model_dump() if result.error else "Validation failed.",
         )
-    )
-    return await service.ingest_document(
-        filename=file.filename or "unknown",
-        content_type=file.content_type or "application/octet-stream",
-        data=contents,
-        request=request,
-    )
+
+    return result

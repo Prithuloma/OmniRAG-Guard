@@ -1,30 +1,22 @@
+"""
+ingestion_service.py
+--------------------
+Service layer — sits between the upload route and the ingestion pipeline.
+"""
+
 from __future__ import annotations
 
-from app.models import DocumentStatus, UploadRequest, UploadResponse
-from app.services.ingestion.pipeline import IngestionPipeline
+from fastapi import UploadFile
+
+from app.services.ingestion.validation import FileValidationResult
+from app.services.ingestion.ingestion_pipeline import run_ingestion_pipeline
 
 
-class IngestionService:
-    def __init__(self, *, pipeline: IngestionPipeline | None = None) -> None:
-        self._pipeline = pipeline or IngestionPipeline()
+async def ingest_file(file: UploadFile) -> FileValidationResult:
+    """
+    Orchestrate file ingestion.
 
-    async def ingest_document(
-        self,
-        *,
-        filename: str,
-        content_type: str,
-        data: bytes,
-        request: UploadRequest | None = None,
-    ) -> UploadResponse:
-        _ = request
-        _ = await self._pipeline.run(
-            filename=filename,
-            content_type=content_type,
-            data=data,
-        )
-        return UploadResponse(
-            success=True,
-            message="Ingestion accepted (placeholder).",
-            filename=filename,
-            status=DocumentStatus.PENDING,
-        )
+    Delegates to the pipeline; returns a FileValidationResult.
+    Raises no exceptions — structured errors live inside the result.
+    """
+    return await run_ingestion_pipeline(file)
