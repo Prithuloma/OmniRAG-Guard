@@ -5,7 +5,13 @@ from app.services.ingestion.validation import (
     ValidationError,
     ValidationErrorCode,
 )
-from app.services.ingestion.parser_dispatcher import ParsedDocument, ParserDispatcher
+from app.services.ingestion.parser_dispatcher import (
+    ParserDispatchResult,
+    ParserDispatchStatus,
+    ParserDispatcher,
+    ParserType,
+    select_parser_type,
+)
 from app.services.ingestion.pipeline import IngestionPipeline, IngestionPipelineResult
 from app.services.ingestion.ingestion_pipeline import run_ingestion_pipeline
 
@@ -16,10 +22,12 @@ __all__ = [
     "FileValidationResult",
     "ValidationError",
     "ValidationErrorCode",
-    "ParsedDocument",
+    "ParserDispatchResult",
+    "ParserDispatchStatus",
     "ParserDispatcher",
+    "ParserType",
+    "select_parser_type",
     "IngestionPipeline",
     "IngestionPipelineResult",
     "run_ingestion_pipeline",
 ]
-
