@@ -1,4 +1,4 @@
-from app.services.ingestion.chunking import Chunk, ChunkingService
+from app.services.chunking import Chunk, ChunkingResult, TextChunker
 from app.services.ingestion.file_validator import validate_upload_file
 from app.services.ingestion.validation import (
     FileValidationResult,
@@ -26,7 +26,8 @@ from app.services.ingestion.ingestion_pipeline import run_ingestion_pipeline
 
 __all__ = [
     "Chunk",
-    "ChunkingService",
+    "ChunkingResult",
+    "TextChunker",
     "validate_upload_file",
     "FileValidationResult",
     "ValidationError",

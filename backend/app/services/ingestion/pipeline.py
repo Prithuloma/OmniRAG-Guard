@@ -2,7 +2,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from app.services.ingestion.chunking import Chunk, ChunkingService
+from app.services.chunking.chunk_models import ChunkingResult
+from app.services.chunking.text_chunker import TextChunker
 from app.services.ingestion.file_validator import FileValidator, ValidationResult
 from app.services.ingestion.parser_dispatcher import (
     ParserDispatchResult,
@@ -17,7 +18,7 @@ class IngestionPipelineResult:
     validations: list[ValidationResult]
     dispatch: ParserDispatchResult | None
     parsed: ParseResult | None
-    chunks: list[Chunk]
+    chunking: ChunkingResult | None
 
 
 class IngestionPipeline:
@@ -26,11 +27,11 @@ class IngestionPipeline:
         *,
         validator: FileValidator | None = None,
         parser: ParserDispatcher | None = None,
-        chunker: ChunkingService | None = None,
+        chunker: TextChunker | None = None,
     ) -> None:
         self._validator = validator or FileValidator()
         self._parser = parser or ParserDispatcher()
-        self._chunker = chunker or ChunkingService()
+        self._chunker = chunker or TextChunker()
 
     async def ingest(
         self,
@@ -51,7 +52,7 @@ class IngestionPipeline:
                 validations=validations,
                 dispatch=None,
                 parsed=None,
-                chunks=[],
+                chunking=None,
             )
 
         # ------------------------------------------------------------------ #
@@ -71,7 +72,7 @@ class IngestionPipeline:
                 validations=validations,
                 dispatch=dispatch_result,
                 parsed=None,
-                chunks=[],
+                chunking=None,
             )
 
         # ------------------------------------------------------------------ #
@@ -84,14 +85,23 @@ class IngestionPipeline:
         )
 
         # ------------------------------------------------------------------ #
-        # 4. Placeholder chunking
+        # 4. Chunk
         # ------------------------------------------------------------------ #
-        chunks = await self._chunker.chunk(parsed=parse_result)
+        chunking_result = self._chunker.chunk_text(
+            text=parse_result.extracted_text,
+            document_id=filename,
+            metadata={
+                "file_name": filename,
+                "content_type": content_type,
+                "parser_type": parse_result.parser_type.value,
+                "parse_status": parse_result.status.value,
+            },
+        )
         return IngestionPipelineResult(
             validations=validations,
             dispatch=dispatch_result,
             parsed=parse_result,
-            chunks=chunks,
+            chunking=chunking_result,
         )
 
     async def run(
