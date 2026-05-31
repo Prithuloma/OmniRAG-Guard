@@ -88,7 +88,7 @@ Final Grounded Response
 
 # Repository Structure
 
-```text
+text
 OmniRAG-Guard/
 │
 ├── frontend/
@@ -100,7 +100,7 @@ OmniRAG-Guard/
 ├── docs/
 ├── tests/
 └── scripts/
-```
+
 
 ---
 
