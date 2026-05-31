@@ -4,13 +4,17 @@ from dataclasses import dataclass
 
 from app.services.ingestion.chunking import Chunk, ChunkingService
 from app.services.ingestion.file_validator import FileValidator, ValidationResult
-from app.services.ingestion.parser_dispatcher import ParsedDocument, ParserDispatcher
+from app.services.ingestion.parser_dispatcher import (
+    ParserDispatchResult,
+    ParserDispatcher,
+    ParserDispatchStatus,
+)
 
 
 @dataclass(frozen=True, slots=True)
 class IngestionPipelineResult:
     validations: list[ValidationResult]
-    parsed: ParsedDocument | None
+    dispatch: ParserDispatchResult | None
     chunks: list[Chunk]
 
 
@@ -33,20 +37,45 @@ class IngestionPipeline:
         content_type: str,
         data: bytes,
     ) -> IngestionPipelineResult:
+        # ------------------------------------------------------------------ #
+        # 1. Validate
+        # ------------------------------------------------------------------ #
         validations: list[ValidationResult] = [
             self._validator.validate_file_type(content_type=content_type),
             self._validator.validate_file_size(num_bytes=len(data)),
         ]
         if not all(v.ok for v in validations):
-            return IngestionPipelineResult(validations=validations, parsed=None, chunks=[])
+            return IngestionPipelineResult(validations=validations, dispatch=None, chunks=[])
 
-        parsed = await self._parser.parse(
+        # ------------------------------------------------------------------ #
+        # 2. Dispatch parser
+        # ------------------------------------------------------------------ #
+        dispatch_result = await self._parser.dispatch(
             filename=filename,
             content_type=content_type,
             data=data,
         )
-        chunks = await self._chunker.chunk(document=parsed)
-        return IngestionPipelineResult(validations=validations, parsed=parsed, chunks=chunks)
+
+        if dispatch_result.status is not ParserDispatchStatus.SELECTED:
+            return IngestionPipelineResult(
+                validations=validations,
+                dispatch=dispatch_result,
+                chunks=[],
+            )
+
+        # Future PDF parser — invoked when parser_type == ParserType.PDF
+        # Future image parser — invoked when parser_type == ParserType.IMAGE
+        # Future text parser — invoked when parser_type == ParserType.TEXT
+
+        # ------------------------------------------------------------------ #
+        # 3. Placeholder chunking
+        # ------------------------------------------------------------------ #
+        chunks = await self._chunker.chunk(dispatch=dispatch_result)
+        return IngestionPipelineResult(
+            validations=validations,
+            dispatch=dispatch_result,
+            chunks=chunks,
+        )
 
     async def run(
         self,
@@ -56,4 +85,3 @@ class IngestionPipeline:
         data: bytes,
     ) -> IngestionPipelineResult:
         return await self.ingest(filename=filename, content_type=content_type, data=data)
-
