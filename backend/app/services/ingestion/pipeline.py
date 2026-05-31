@@ -9,12 +9,14 @@ from app.services.ingestion.parser_dispatcher import (
     ParserDispatcher,
     ParserDispatchStatus,
 )
+from app.services.ingestion.parsers.base_parser import ParseResult
 
 
 @dataclass(frozen=True, slots=True)
 class IngestionPipelineResult:
     validations: list[ValidationResult]
     dispatch: ParserDispatchResult | None
+    parsed: ParseResult | None
     chunks: list[Chunk]
 
 
@@ -45,7 +47,12 @@ class IngestionPipeline:
             self._validator.validate_file_size(num_bytes=len(data)),
         ]
         if not all(v.ok for v in validations):
-            return IngestionPipelineResult(validations=validations, dispatch=None, chunks=[])
+            return IngestionPipelineResult(
+                validations=validations,
+                dispatch=None,
+                parsed=None,
+                chunks=[],
+            )
 
         # ------------------------------------------------------------------ #
         # 2. Dispatch parser
@@ -56,24 +63,34 @@ class IngestionPipeline:
             data=data,
         )
 
-        if dispatch_result.status is not ParserDispatchStatus.SELECTED:
+        if (
+            dispatch_result.status is not ParserDispatchStatus.SELECTED
+            or dispatch_result.parser is None
+        ):
             return IngestionPipelineResult(
                 validations=validations,
                 dispatch=dispatch_result,
+                parsed=None,
                 chunks=[],
             )
 
-        # Future PDF parser — invoked when parser_type == ParserType.PDF
-        # Future image parser — invoked when parser_type == ParserType.IMAGE
-        # Future text parser — invoked when parser_type == ParserType.TEXT
+        # ------------------------------------------------------------------ #
+        # 3. Parse
+        # ------------------------------------------------------------------ #
+        parse_result = await dispatch_result.parser.parse(
+            filename=filename,
+            content_type=content_type,
+            data=data,
+        )
 
         # ------------------------------------------------------------------ #
-        # 3. Placeholder chunking
+        # 4. Placeholder chunking
         # ------------------------------------------------------------------ #
-        chunks = await self._chunker.chunk(dispatch=dispatch_result)
+        chunks = await self._chunker.chunk(parsed=parse_result)
         return IngestionPipelineResult(
             validations=validations,
             dispatch=dispatch_result,
+            parsed=parse_result,
             chunks=chunks,
         )
 

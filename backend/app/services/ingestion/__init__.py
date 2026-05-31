@@ -9,8 +9,17 @@ from app.services.ingestion.parser_dispatcher import (
     ParserDispatchResult,
     ParserDispatchStatus,
     ParserDispatcher,
-    ParserType,
+    create_parser,
     select_parser_type,
+)
+from app.services.ingestion.parsers import (
+    BaseParser,
+    ImageParser,
+    PDFParser,
+    ParseResult,
+    ParseStatus,
+    ParserType,
+    TextParser,
 )
 from app.services.ingestion.pipeline import IngestionPipeline, IngestionPipelineResult
 from app.services.ingestion.ingestion_pipeline import run_ingestion_pipeline
@@ -25,8 +34,15 @@ __all__ = [
     "ParserDispatchResult",
     "ParserDispatchStatus",
     "ParserDispatcher",
-    "ParserType",
+    "create_parser",
     "select_parser_type",
+    "BaseParser",
+    "ParseResult",
+    "ParseStatus",
+    "ParserType",
+    "PDFParser",
+    "ImageParser",
+    "TextParser",
     "IngestionPipeline",
     "IngestionPipelineResult",
     "run_ingestion_pipeline",

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from app.services.ingestion.parser_dispatcher import ParserDispatchResult
+from app.services.ingestion.parsers.base_parser import ParseResult
 
 
 @dataclass(frozen=True, slots=True)
@@ -13,7 +13,7 @@ class Chunk:
 
 
 class ChunkingService:
-    async def chunk(self, *, dispatch: ParserDispatchResult) -> list[Chunk]:
-        _ = dispatch
-        # Placeholder chunking — runs after parser dispatch selection
+    async def chunk(self, *, parsed: ParseResult) -> list[Chunk]:
+        _ = parsed
+        # Placeholder chunking — runs after parser.parse()
         return []

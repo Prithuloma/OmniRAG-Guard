@@ -5,25 +5,16 @@ from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any
 
-# ---------------------------------------------------------------------------
-# Parser modality taxonomy
-# ---------------------------------------------------------------------------
-
-
-class ParserType(str, Enum):
-    PDF = "pdf"
-    IMAGE = "image"
-    TEXT = "text"
+from app.services.ingestion.parsers.base_parser import BaseParser, ParserType
+from app.services.ingestion.parsers.image_parser import ImageParser
+from app.services.ingestion.parsers.pdf_parser import PDFParser
+from app.services.ingestion.parsers.text_parser import TextParser
 
 
 class ParserDispatchStatus(str, Enum):
     SELECTED = "selected"
     UNSUPPORTED = "unsupported"
 
-
-# ---------------------------------------------------------------------------
-# Extension → parser routing table
-# ---------------------------------------------------------------------------
 
 _EXTENSION_TO_PARSER: dict[str, ParserType] = {
     ".pdf": ParserType.PDF,
@@ -34,15 +25,21 @@ _EXTENSION_TO_PARSER: dict[str, ParserType] = {
     ".docx": ParserType.TEXT,
 }
 
+_PARSER_FACTORY: dict[ParserType, type[BaseParser]] = {
+    ParserType.PDF: PDFParser,
+    ParserType.IMAGE: ImageParser,
+    ParserType.TEXT: TextParser,
+}
+
 
 def select_parser_type(extension: str) -> ParserType | None:
     """Return the parser modality for a normalized file extension, or None."""
     return _EXTENSION_TO_PARSER.get(extension.lower())
 
 
-# ---------------------------------------------------------------------------
-# Dispatch result model
-# ---------------------------------------------------------------------------
+def create_parser(parser_type: ParserType) -> BaseParser:
+    """Instantiate the parser implementation for the given modality."""
+    return _PARSER_FACTORY[parser_type]()
 
 
 @dataclass(frozen=True, slots=True)
@@ -51,12 +48,8 @@ class ParserDispatchResult:
     file_name: str
     file_extension: str
     status: ParserDispatchStatus
+    parser: BaseParser | None
     metadata: dict[str, Any] = field(default_factory=dict)
-
-
-# ---------------------------------------------------------------------------
-# Parser dispatcher — routing only, no parsing
-# ---------------------------------------------------------------------------
 
 
 class ParserDispatcher:
@@ -84,6 +77,7 @@ class ParserDispatcher:
                 file_name=filename,
                 file_extension=file_extension,
                 status=ParserDispatchStatus.UNSUPPORTED,
+                parser=None,
                 metadata=metadata,
             )
 
@@ -92,5 +86,6 @@ class ParserDispatcher:
             file_name=filename,
             file_extension=file_extension,
             status=ParserDispatchStatus.SELECTED,
+            parser=create_parser(parser_type),
             metadata=metadata,
         )
