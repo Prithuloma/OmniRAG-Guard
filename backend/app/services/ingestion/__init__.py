@@ -1,4 +1,11 @@
 from app.services.chunking import Chunk, ChunkingResult, TextChunker
+from app.services.embeddings import (
+    BaseEmbedder,
+    Embedding,
+    EmbeddingResult,
+    EmbeddingService,
+    PlaceholderEmbedder,
+)
 from app.services.ingestion.file_validator import validate_upload_file
 from app.services.ingestion.validation import (
     FileValidationResult,
@@ -28,6 +35,11 @@ __all__ = [
     "Chunk",
     "ChunkingResult",
     "TextChunker",
+    "BaseEmbedder",
+    "Embedding",
+    "EmbeddingResult",
+    "EmbeddingService",
+    "PlaceholderEmbedder",
     "validate_upload_file",
     "FileValidationResult",
     "ValidationError",
