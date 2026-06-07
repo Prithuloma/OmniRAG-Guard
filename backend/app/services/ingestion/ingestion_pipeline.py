@@ -16,7 +16,7 @@ import time
 from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path
-from typing import Any
+from typing import Any, TYPE_CHECKING
 
 from fastapi import UploadFile
 
@@ -30,6 +30,9 @@ from app.services.ingestion.parser_dispatcher import (
 from app.services.ingestion.parsers.base_parser import ParseResult, ParseStatus
 from app.services.ingestion.validation import FileValidationResult
 from app.services.vector_store.qdrant_store import QdrantStore, QdrantStoreError
+
+if TYPE_CHECKING:
+    from app.services.ingestion_service import UploadIngestionResult
 
 logger = logging.getLogger(__name__)
 
@@ -349,12 +352,12 @@ async def ingest_document(
     )
 
 
-async def run_ingestion_pipeline(file: UploadFile) -> FileValidationResult:
+async def run_ingestion_pipeline(file: UploadFile) -> UploadIngestionResult:
     """
     Entry point for the upload API ingestion pipeline.
 
-    Currently executes the validation gate only.
-    Returns FileValidationResult; pipeline aborts on invalid files.
+    Validates, stores, and ingests the uploaded file.
     """
-    validation_result: FileValidationResult = await validate_upload_file(file)
-    return validation_result
+    from app.services.ingestion_service import ingest_file
+
+    return await ingest_file(file)

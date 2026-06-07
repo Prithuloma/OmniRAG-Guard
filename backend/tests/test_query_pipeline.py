@@ -203,3 +203,28 @@ def test_response_schema_correctness() -> None:
 
     validated = QueryResponse.model_validate(payload)
     assert validated.status is QueryStatus.SUCCESS
+
+
+def test_response_accepts_negative_qdrant_scores() -> None:
+    negative_score = -0.0054543726
+    chunk = RetrievedChunk(
+        chunk_id="doc-1:chunk:0",
+        document_id="doc-1",
+        page_number=1,
+        text="Chunk with negative similarity score.",
+        score=negative_score,
+    )
+    result = QueryPipelineResult(
+        query_id="qry_negative_score",
+        query="test query",
+        status="success",
+        retrieved_chunks=[_map_chunk(chunk)],
+        chunk_count=1,
+        latency_ms=3.2,
+    )
+
+    response = to_query_response(result)
+
+    assert response.retrieved_chunks[0].score == negative_score
+    assert response.confidence == negative_score
+    QueryResponse.model_validate(response.model_dump())
