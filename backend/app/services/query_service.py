@@ -2,7 +2,7 @@
 query_service.py
 ----------------
 Service layer for the query pipeline — validates input, delegates retrieval,
-and maps results to API response models.
+calls LLM generation, and maps results to API response models.
 """
 
 from __future__ import annotations
@@ -15,6 +15,7 @@ from uuid import uuid4
 from app.models.base import QueryStatus
 from app.models.request_models import QueryRequest
 from app.models.response_models import QueryResponse, RetrievedChunk as ApiRetrievedChunk
+from app.services.llm.llm_service import LLMService
 from app.services.retrieval_service import (
     RetrievalService,
     RetrievedChunk,
@@ -26,6 +27,7 @@ class QueryPipelineErrorCode(str, Enum):
     RETRIEVAL_FAILED = "RETRIEVAL_FAILED"
     QDRANT_UNAVAILABLE = "QDRANT_UNAVAILABLE"
     NO_RESULTS = "NO_RESULTS"
+    GENERATION_FAILED = "GENERATION_FAILED"
 
 
 @dataclass(frozen=True, slots=True)
@@ -43,12 +45,20 @@ class QueryPipelineResult:
     retrieved_chunks: list[ApiRetrievedChunk]
     chunk_count: int
     latency_ms: float
+    answer: str = ""
+    confidence: float = 0.0
     error: QueryPipelineError | None = None
 
 
 class QueryService:
-    def __init__(self, *, retrieval_service: RetrievalService | None = None) -> None:
+    def __init__(
+        self,
+        *,
+        retrieval_service: RetrievalService | None = None,
+        llm_service: LLMService | None = None,
+    ) -> None:
         self._retrieval = retrieval_service or RetrievalService()
+        self._llm = llm_service or LLMService()
 
     async def execute_query(self, request: QueryRequest) -> QueryPipelineResult:
         started_at = time.perf_counter()
@@ -71,10 +81,30 @@ class QueryService:
             normalized_query,
             top_k=request.top_k,
         )
-        elapsed_ms = (time.perf_counter() - started_at) * 1000.0
 
         if retrieval_result.status == "success":
             api_chunks = [_map_chunk(chunk) for chunk in retrieval_result.chunks]
+            generation = await self._llm.generate_answer(
+                query=retrieval_result.query,
+                chunks=retrieval_result.chunks,
+            )
+            elapsed_ms = (time.perf_counter() - started_at) * 1000.0
+
+            if not generation.success or not generation.answer.strip():
+                return QueryPipelineResult(
+                    query_id=query_id,
+                    query=retrieval_result.query,
+                    status="generation_failed",
+                    retrieved_chunks=api_chunks,
+                    chunk_count=len(api_chunks),
+                    latency_ms=elapsed_ms,
+                    error=QueryPipelineError(
+                        code=QueryPipelineErrorCode.GENERATION_FAILED,
+                        message="Failed to generate an answer from retrieved context.",
+                        detail=generation.metadata.get("error"),
+                    ),
+                )
+
             return QueryPipelineResult(
                 query_id=query_id,
                 query=retrieval_result.query,
@@ -82,7 +112,11 @@ class QueryService:
                 retrieved_chunks=api_chunks,
                 chunk_count=len(api_chunks),
                 latency_ms=elapsed_ms,
+                answer=generation.answer,
+                confidence=generation.confidence,
             )
+
+        elapsed_ms = (time.perf_counter() - started_at) * 1000.0
 
         if retrieval_result.status == "no_results":
             return QueryPipelineResult(
@@ -164,10 +198,6 @@ def to_query_response(result: QueryPipelineResult) -> QueryResponse:
     success = result.status in {"success", "no_results"}
     message = _result_message(result)
 
-    confidence = 0.0
-    if result.retrieved_chunks:
-        confidence = max(chunk.score for chunk in result.retrieved_chunks)
-
     return QueryResponse(
         success=success,
         message=message,
@@ -177,8 +207,8 @@ def to_query_response(result: QueryPipelineResult) -> QueryResponse:
         retrieved_chunks=result.retrieved_chunks,
         chunk_count=result.chunk_count,
         latency_ms=result.latency_ms,
-        answer="",
-        confidence=confidence,
+        answer=result.answer,
+        confidence=result.confidence,
     )
 
 
@@ -202,7 +232,7 @@ def _map_query_status(status: str) -> QueryStatus:
 
 def _result_message(result: QueryPipelineResult) -> str:
     if result.status == "success":
-        return f"Retrieved {result.chunk_count} chunk(s)."
+        return f"Retrieved {result.chunk_count} chunk(s) and generated an answer."
     if result.error is not None:
         return result.error.message
     return "Query completed."

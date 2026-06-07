@@ -43,7 +43,7 @@ async def query_documents(payload: QueryRequest) -> QueryResponse:
             },
         )
 
-    if result.status in {"retrieval_failed", "qdrant_unavailable"}:
+    if result.status in {"retrieval_failed", "qdrant_unavailable", "generation_failed"}:
         error_code = result.error.code.value if result.error else "retrieval_failed"
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,

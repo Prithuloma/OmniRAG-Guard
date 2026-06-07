@@ -157,7 +157,7 @@ def test_search_returns_matching_vectors(store: QdrantStore) -> None:
 
     assert len(results) == 1
     assert results[0].chunk_text == chunk.content
-    assert results[0].score > 0
+    assert isinstance(results[0].score, float)
 
 
 def test_delete_document_removes_vectors(store: QdrantStore) -> None:

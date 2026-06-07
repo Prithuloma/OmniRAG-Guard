@@ -20,6 +20,9 @@ class Settings(BaseSettings):
     QDRANT_URL: str = "http://localhost:6333"
     QDRANT_COLLECTION_NAME: str = "omnirag_documents"
 
+    # ── Storage ───────────────────────────────────────────
+    UPLOAD_DIR: str = "storage/uploads"
+
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",

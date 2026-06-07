@@ -76,6 +76,28 @@ class UploadResponse(BaseResponse):
     )
 
 
+class UploadIngestionResponse(BaseModel):
+    """Returned by POST /upload after validation, storage, and ingestion."""
+    document_id: str = Field(
+        description="Stable identifier assigned to the ingested document.",
+        examples=["doc_a1b2c3d4e5f6"],
+    )
+    status: str = Field(
+        description="Ingestion pipeline outcome.",
+        examples=["success"],
+    )
+    chunks_created: int = Field(
+        ge=0,
+        description="Number of text chunks generated from the document.",
+        examples=[12],
+    )
+    vectors_stored: int = Field(
+        ge=0,
+        description="Number of vectors upserted into the vector store.",
+        examples=[12],
+    )
+
+
 # ── Query ─────────────────────────────────────────────────────────────────────
 
 class RetrievedChunk(BaseModel):
@@ -102,9 +124,7 @@ class RetrievedChunk(BaseModel):
         examples=["Revenue increased by 18% YoY driven by SaaS subscriptions."],
     )
     score: float = Field(
-        ge=0.0,
-        le=1.0,
-        description="Similarity score between chunk and query (0 – 1).",
+        description="Similarity score returned by the vector store for this chunk.",
         examples=[0.87],
     )
 
@@ -145,9 +165,7 @@ class QueryResponse(BaseResponse):
     )
     confidence: float = Field(
         default=0.0,
-        ge=0.0,
-        le=1.0,
-        description="Aggregate confidence score across retrieved chunks (0 – 1).",
+        description="Aggregate confidence score derived from retrieved chunk scores.",
         examples=[0.82],
     )
 

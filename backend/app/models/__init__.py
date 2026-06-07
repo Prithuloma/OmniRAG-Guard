@@ -10,6 +10,7 @@ from app.models.response_models import (
     ErrorDetail,
     ErrorResponse,
     UploadResponse,
+    UploadIngestionResponse,
     RetrievedChunk,
     QueryResponse,
 )
@@ -28,6 +29,7 @@ __all__ = [
     "ErrorDetail",
     "ErrorResponse",
     "UploadResponse",
+    "UploadIngestionResponse",
     "RetrievedChunk",
     "QueryResponse",
 ]

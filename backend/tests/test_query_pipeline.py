@@ -13,6 +13,8 @@ import pytest
 from app.models.base import QueryStatus
 from app.models.request_models import QueryRequest
 from app.models.response_models import QueryResponse
+from app.services.llm.llm_service import LLMService
+from app.services.llm.mock_llm import MockLLM
 from app.services.query_service import (
     QueryPipelineErrorCode,
     QueryPipelineResult,
@@ -55,7 +57,10 @@ def retrieval_service() -> AsyncMock:
 
 @pytest.fixture
 def query_service(retrieval_service: AsyncMock) -> QueryService:
-    return QueryService(retrieval_service=retrieval_service)
+    return QueryService(
+        retrieval_service=retrieval_service,
+        llm_service=LLMService(provider=MockLLM()),
+    )
 
 
 @pytest.mark.asyncio
@@ -73,6 +78,9 @@ async def test_successful_retrieval(
     assert result.chunk_count == 1
     assert len(result.retrieved_chunks) == 1
     assert result.retrieved_chunks[0].text == "Revenue increased by 18% YoY."
+    assert result.answer
+    assert "Revenue increased by 18% YoY" in result.answer
+    assert result.confidence == pytest.approx(0.91)
     assert result.latency_ms >= 0.0
     retrieval_service.retrieve.assert_awaited_once_with(
         "What drove revenue growth?",
@@ -173,6 +181,8 @@ def test_response_schema_correctness() -> None:
         retrieved_chunks=[_map_chunk(chunk)],
         chunk_count=1,
         latency_ms=12.5,
+        answer="Generated answer.",
+        confidence=0.91,
     )
 
     response = to_query_response(result)
@@ -200,6 +210,36 @@ def test_response_schema_correctness() -> None:
     assert payload["retrieved_chunks"][0]["page_number"] == 2
     assert payload["retrieved_chunks"][0]["text"] == "Revenue increased by 18% YoY."
     assert payload["retrieved_chunks"][0]["score"] == 0.91
+    assert payload["answer"] == "Generated answer."
+    assert payload["confidence"] == 0.91
 
     validated = QueryResponse.model_validate(payload)
     assert validated.status is QueryStatus.SUCCESS
+
+
+def test_response_accepts_negative_qdrant_scores() -> None:
+    negative_score = -0.0054543726
+    chunk = RetrievedChunk(
+        chunk_id="doc-1:chunk:0",
+        document_id="doc-1",
+        page_number=1,
+        text="Chunk with negative similarity score.",
+        score=negative_score,
+    )
+    result = QueryPipelineResult(
+        query_id="qry_negative_score",
+        query="test query",
+        status="success",
+        retrieved_chunks=[_map_chunk(chunk)],
+        chunk_count=1,
+        latency_ms=3.2,
+        answer="Answer grounded in negative-score chunk.",
+        confidence=negative_score,
+    )
+
+    response = to_query_response(result)
+
+    assert response.retrieved_chunks[0].score == negative_score
+    assert response.confidence == negative_score
+    assert response.answer == "Answer grounded in negative-score chunk."
+    QueryResponse.model_validate(response.model_dump())
