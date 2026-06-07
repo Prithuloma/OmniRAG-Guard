@@ -29,7 +29,14 @@ from app.services.ingestion.parsers import (
     TextParser,
 )
 from app.services.ingestion.pipeline import IngestionPipeline, IngestionPipelineResult
-from app.services.ingestion.ingestion_pipeline import run_ingestion_pipeline
+from app.services.ingestion.ingestion_pipeline import (
+    DocumentIngestionPipeline,
+    IngestionError,
+    IngestionErrorCode,
+    IngestionResult,
+    ingest_document,
+    run_ingestion_pipeline,
+)
 
 __all__ = [
     "Chunk",
@@ -58,5 +65,10 @@ __all__ = [
     "TextParser",
     "IngestionPipeline",
     "IngestionPipelineResult",
+    "DocumentIngestionPipeline",
+    "IngestionError",
+    "IngestionErrorCode",
+    "IngestionResult",
+    "ingest_document",
     "run_ingestion_pipeline",
 ]

@@ -1,11 +1,12 @@
-from fastapi import APIRouter, status
+from fastapi import APIRouter, HTTPException, status
 
 from app.models.request_models import QueryRequest
 from app.models.response_models import (
+    ErrorDetail,
     ErrorResponse,
     QueryResponse,
 )
-from app.services import RetrievalService
+from app.services.query_service import QueryService, to_query_response
 
 router = APIRouter()
 
@@ -25,12 +26,32 @@ async def query_documents(payload: QueryRequest) -> QueryResponse:
     """
     Submit a natural-language query against ingested documents.
 
-    Returns a synthesised **answer**, a **confidence** score, and the
-    **retrieved chunks** that grounded the answer.
+    Returns retrieved context chunks ranked by similarity to the query.
 
     Respects `top_k` and optional `filters.document_ids` / `filters.tags`.
-
-    > ⚠️ Retrieval and generation logic is not yet implemented — mock response returned.
     """
-    service = RetrievalService()
-    return await service.retrieve_answer(request=payload)
+    service = QueryService()
+    result = await service.execute_query(payload)
+
+    if result.status == "empty_query":
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail={
+                "code": result.error.code.value if result.error else "EMPTY_QUERY",
+                "message": result.error.message if result.error else "Query must not be empty.",
+                "field": "query",
+            },
+        )
+
+    if result.status in {"retrieval_failed", "qdrant_unavailable"}:
+        error_code = result.error.code.value if result.error else "retrieval_failed"
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=ErrorDetail(
+                code=error_code.lower(),
+                field="query",
+                context={"detail": result.error.detail} if result.error and result.error.detail else None,
+            ).model_dump(),
+        )
+
+    return to_query_response(result)

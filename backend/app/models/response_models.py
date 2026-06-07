@@ -91,7 +91,13 @@ class RetrievedChunk(BaseModel):
         description="Parent document this chunk belongs to.",
         examples=["doc_a1b2c3d4e5f6"],
     )
-    content: str = Field(
+    page_number: int = Field(
+        default=0,
+        ge=0,
+        description="Source page in the original document, if available.",
+        examples=[4],
+    )
+    text: str = Field(
         description="Raw chunk text passed to the LLM as context.",
         examples=["Revenue increased by 18% YoY driven by SaaS subscriptions."],
     )
@@ -100,12 +106,6 @@ class RetrievedChunk(BaseModel):
         le=1.0,
         description="Similarity score between chunk and query (0 – 1).",
         examples=[0.87],
-    )
-    page_number: Optional[int] = Field(
-        default=None,
-        ge=1,
-        description="Source page in the original document, if available.",
-        examples=[4],
     )
 
 
@@ -117,32 +117,43 @@ class QueryResponse(BaseResponse):
         description="Unique identifier for this query execution.",
         examples=["qry_f7e8d9c0b1a2"],
     )
+    query: str = Field(
+        description="Normalized query string executed against the retrieval pipeline.",
+        examples=["What were the key revenue drivers in Q3 2024?"],
+    )
+    status: QueryStatus = Field(
+        description="Resolution quality of the query.",
+    )
+    retrieved_chunks: list[RetrievedChunk] = Field(
+        default_factory=list,
+        description="Ordered list of context chunks retrieved for the query.",
+    )
+    chunk_count: int = Field(
+        ge=0,
+        description="Number of chunks returned in retrieved_chunks.",
+        examples=[3],
+    )
+    latency_ms: float = Field(
+        ge=0.0,
+        description="Total wall-clock time for retrieval in milliseconds.",
+        examples=[420.5],
+    )
     answer: str = Field(
+        default="",
         description="LLM-generated answer grounded in retrieved chunks.",
         examples=["Q3 2024 revenue grew 18% YoY, primarily driven by SaaS."],
     )
-    status: QueryStatus = Field(
-        description="Resolution quality of the answer.",
-    )
     confidence: float = Field(
+        default=0.0,
         ge=0.0,
         le=1.0,
         description="Aggregate confidence score across retrieved chunks (0 – 1).",
         examples=[0.82],
     )
-    retrieved_chunks: list[RetrievedChunk] = Field(
-        default_factory=list,
-        description="Ordered list of context chunks used to generate the answer.",
-    )
-    latency_ms: float = Field(
-        ge=0.0,
-        description="Total wall-clock time for retrieval + generation in milliseconds.",
-        examples=[420.5],
-    )
 
     @model_validator(mode="after")
     def _clamp_confidence_on_failed(self) -> "QueryResponse":
         """Confidence must be 0 when status is FAILED — enforced at model level."""
-        if self.status == QueryStatus.FAILED:
+        if self.status in {QueryStatus.FAILED, QueryStatus.NO_RESULTS}:
             self.confidence = 0.0
         return self

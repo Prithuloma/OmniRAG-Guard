@@ -16,6 +16,10 @@ class Settings(BaseSettings):
     # ── Environment ───────────────────────────────────────
     APP_ENV: Literal["development", "staging", "production"] = "development"
 
+    # ── Qdrant ────────────────────────────────────────────
+    QDRANT_URL: str = "http://localhost:6333"
+    QDRANT_COLLECTION_NAME: str = "omnirag_documents"
+
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",
