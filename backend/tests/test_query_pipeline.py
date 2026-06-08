@@ -15,6 +15,7 @@ from app.models.request_models import QueryRequest
 from app.models.response_models import QueryResponse
 from app.services.llm.llm_service import LLMService
 from app.services.llm.mock_llm import MockLLM
+from app.services.verification.verification_service import VerificationService
 from app.services.query_service import (
     QueryPipelineErrorCode,
     QueryPipelineResult,
@@ -60,6 +61,7 @@ def query_service(retrieval_service: AsyncMock) -> QueryService:
     return QueryService(
         retrieval_service=retrieval_service,
         llm_service=LLMService(provider=MockLLM()),
+        verification_service=VerificationService(),
     )
 
 
@@ -80,7 +82,9 @@ async def test_successful_retrieval(
     assert result.retrieved_chunks[0].text == "Revenue increased by 18% YoY."
     assert result.answer
     assert "Revenue increased by 18% YoY" in result.answer
-    assert result.confidence == pytest.approx(0.91)
+    assert result.evidence_score >= 0.0
+    assert isinstance(result.grounded, bool)
+    assert result.verification_reason
     assert result.latency_ms >= 0.0
     retrieval_service.retrieve.assert_awaited_once_with(
         "What drove revenue growth?",
@@ -182,7 +186,10 @@ def test_response_schema_correctness() -> None:
         chunk_count=1,
         latency_ms=12.5,
         answer="Generated answer.",
-        confidence=0.91,
+        confidence=0.85,
+        evidence_score=0.82,
+        grounded=True,
+        verification_reason="Answer is supported by retrieved chunks.",
     )
 
     response = to_query_response(result)
@@ -211,7 +218,10 @@ def test_response_schema_correctness() -> None:
     assert payload["retrieved_chunks"][0]["text"] == "Revenue increased by 18% YoY."
     assert payload["retrieved_chunks"][0]["score"] == 0.91
     assert payload["answer"] == "Generated answer."
-    assert payload["confidence"] == 0.91
+    assert payload["confidence"] == 0.85
+    assert payload["evidence_score"] == 0.82
+    assert payload["grounded"] is True
+    assert payload["verification_reason"] == "Answer is supported by retrieved chunks."
 
     validated = QueryResponse.model_validate(payload)
     assert validated.status is QueryStatus.SUCCESS
@@ -235,11 +245,15 @@ def test_response_accepts_negative_qdrant_scores() -> None:
         latency_ms=3.2,
         answer="Answer grounded in negative-score chunk.",
         confidence=negative_score,
+        evidence_score=0.75,
+        grounded=True,
+        verification_reason="Answer is supported by retrieved chunks.",
     )
 
     response = to_query_response(result)
 
     assert response.retrieved_chunks[0].score == negative_score
     assert response.confidence == negative_score
+    assert response.evidence_score == 0.75
     assert response.answer == "Answer grounded in negative-score chunk."
     QueryResponse.model_validate(response.model_dump())

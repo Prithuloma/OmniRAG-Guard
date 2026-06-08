@@ -165,8 +165,24 @@ class QueryResponse(BaseResponse):
     )
     confidence: float = Field(
         default=0.0,
-        description="Aggregate confidence score derived from retrieved chunk scores.",
+        description="Blended confidence score from retrieval and evidence verification.",
+        examples=[0.85],
+    )
+    evidence_score: float = Field(
+        default=0.0,
+        ge=0.0,
+        le=1.0,
+        description="Lexical evidence score measuring answer support in retrieved chunks.",
         examples=[0.82],
+    )
+    grounded: bool = Field(
+        default=False,
+        description="Whether the generated answer is supported by retrieved evidence.",
+    )
+    verification_reason: str = Field(
+        default="",
+        description="Human-readable explanation of the verification outcome.",
+        examples=["Answer is supported by retrieved chunks."],
     )
 
     @model_validator(mode="after")
@@ -174,4 +190,6 @@ class QueryResponse(BaseResponse):
         """Confidence must be 0 when status is FAILED — enforced at model level."""
         if self.status in {QueryStatus.FAILED, QueryStatus.NO_RESULTS}:
             self.confidence = 0.0
+            self.evidence_score = 0.0
+            self.grounded = False
         return self

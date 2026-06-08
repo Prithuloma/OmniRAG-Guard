@@ -2,7 +2,7 @@
 query_service.py
 ----------------
 Service layer for the query pipeline — validates input, delegates retrieval,
-calls LLM generation, and maps results to API response models.
+calls LLM generation, verifies evidence, and maps results to API response models.
 """
 
 from __future__ import annotations
@@ -20,6 +20,7 @@ from app.services.retrieval_service import (
     RetrievalService,
     RetrievedChunk,
 )
+from app.services.verification.verification_service import VerificationService
 
 
 class QueryPipelineErrorCode(str, Enum):
@@ -47,6 +48,9 @@ class QueryPipelineResult:
     latency_ms: float
     answer: str = ""
     confidence: float = 0.0
+    evidence_score: float = 0.0
+    grounded: bool = False
+    verification_reason: str = ""
     error: QueryPipelineError | None = None
 
 
@@ -56,9 +60,11 @@ class QueryService:
         *,
         retrieval_service: RetrievalService | None = None,
         llm_service: LLMService | None = None,
+        verification_service: VerificationService | None = None,
     ) -> None:
         self._retrieval = retrieval_service or RetrievalService()
         self._llm = llm_service or LLMService()
+        self._verification = verification_service or VerificationService()
 
     async def execute_query(self, request: QueryRequest) -> QueryPipelineResult:
         started_at = time.perf_counter()
@@ -105,6 +111,12 @@ class QueryService:
                     ),
                 )
 
+            verification = await self._verification.verify(
+                query=retrieval_result.query,
+                generated_answer=generation.answer,
+                retrieved_chunks=retrieval_result.chunks,
+            )
+
             return QueryPipelineResult(
                 query_id=query_id,
                 query=retrieval_result.query,
@@ -113,7 +125,10 @@ class QueryService:
                 chunk_count=len(api_chunks),
                 latency_ms=elapsed_ms,
                 answer=generation.answer,
-                confidence=generation.confidence,
+                confidence=verification.confidence,
+                evidence_score=verification.evidence_score,
+                grounded=verification.grounded,
+                verification_reason=verification.verification_reason,
             )
 
         elapsed_ms = (time.perf_counter() - started_at) * 1000.0
@@ -209,6 +224,9 @@ def to_query_response(result: QueryPipelineResult) -> QueryResponse:
         latency_ms=result.latency_ms,
         answer=result.answer,
         confidence=result.confidence,
+        evidence_score=result.evidence_score,
+        grounded=result.grounded,
+        verification_reason=result.verification_reason,
     )
 
 
@@ -232,7 +250,10 @@ def _map_query_status(status: str) -> QueryStatus:
 
 def _result_message(result: QueryPipelineResult) -> str:
     if result.status == "success":
-        return f"Retrieved {result.chunk_count} chunk(s) and generated an answer."
+        return (
+            f"Retrieved {result.chunk_count} chunk(s), generated an answer, "
+            "and completed verification."
+        )
     if result.error is not None:
         return result.error.message
     return "Query completed."
