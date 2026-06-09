@@ -6,6 +6,7 @@ Upload route — accepts multipart file, delegates to ingestion service.
 
 from __future__ import annotations
 
+import logging
 from fastapi import APIRouter, HTTPException, UploadFile, status
 
 from app.models.response_models import UploadIngestionResponse
@@ -14,6 +15,7 @@ from app.services.ingestion_service import (
     ingest_file,
 )
 
+logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/upload", tags=["Upload"])
 
 
@@ -30,9 +32,11 @@ async def upload_file(file: UploadFile) -> UploadIngestionResponse:
     Validates the file, stores it locally, runs the ingestion pipeline,
     and returns an ingestion summary.
     """
+    logger.info(f"Received upload request for file: filename={file.filename}, content_type={file.content_type}")
     result = await ingest_file(file)
 
     if result.status == "validation_failed":
+        logger.warning(f"File upload validation failed: filename={file.filename}, detail={result.validation.error if result.validation else 'Unknown'}")
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail=result.validation.error.model_dump()
@@ -41,6 +45,7 @@ async def upload_file(file: UploadFile) -> UploadIngestionResponse:
         )
 
     if result.status == "file_save_failed":
+        logger.error(f"File save failed: filename={file.filename}, error={result.error}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail={
@@ -52,6 +57,7 @@ async def upload_file(file: UploadFile) -> UploadIngestionResponse:
 
     if result.status == "ingestion_failed":
         ingestion_status = result.ingestion.status if result.ingestion else "unknown"
+        logger.error(f"Document ingestion failed: filename={file.filename}, document_id={result.document_id}, status={ingestion_status}")
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail={
@@ -64,11 +70,13 @@ async def upload_file(file: UploadFile) -> UploadIngestionResponse:
         )
 
     if not result.document_id:
+        logger.error(f"Ingestion succeeded but no document ID returned: filename={file.filename}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Upload completed without a document identifier.",
         )
 
+    logger.info(f"Ingestion completed successfully: filename={file.filename}, document_id={result.document_id}, chunks={result.chunks_created}")
     return UploadIngestionResponse(
         document_id=result.document_id,
         status=result.status,

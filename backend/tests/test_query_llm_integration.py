@@ -52,10 +52,15 @@ def retrieval_service() -> AsyncMock:
 async def test_query_pipeline_generates_answer_after_retrieval(
     retrieval_service: AsyncMock,
 ) -> None:
+    embedder = AsyncMock()
+    v1 = [1.0] * 384
+    embedder.embed.side_effect = [[v1], [v1]]
+    embedder.dimension = 384
+
     service = QueryService(
         retrieval_service=retrieval_service,
         llm_service=LLMService(provider=MockLLM()),
-        verification_service=VerificationService(),
+        verification_service=VerificationService(embedder=embedder),
     )
 
     result = await service.execute_query(
@@ -66,10 +71,7 @@ async def test_query_pipeline_generates_answer_after_retrieval(
     assert result.chunk_count == 1
     assert result.answer
     assert "OmniRAG-Guard is a FastAPI-based RAG system" in result.answer
-    assert result.confidence == pytest.approx(
-        RETRIEVAL_CONFIDENCE_WEIGHT * 0.88
-        + EVIDENCE_CONFIDENCE_WEIGHT * result.evidence_score
-    )
+    assert result.confidence == pytest.approx(0.3 * 0.88 + 0.5 * 1.0 + 0.2 * 1.0)
 
 
 @pytest.mark.asyncio

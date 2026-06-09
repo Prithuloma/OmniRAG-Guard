@@ -10,5 +10,7 @@ class VerificationResult:
     grounded: bool
     verification_reason: str
     confidence: float
+    grounding_score: float = 0.0
+    citations: list[dict[str, Any]] = field(default_factory=list)
     retrieval_confidence: float = 0.0
     metadata: dict[str, Any] = field(default_factory=dict)

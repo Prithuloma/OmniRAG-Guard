@@ -129,6 +129,20 @@ class RetrievedChunk(BaseModel):
     )
 
 
+class Citation(BaseModel):
+    """Source attribution for LLM generated answers."""
+    document_id: str = Field(description="Parent document identifier.")
+    chunk_id: str = Field(description="Source chunk identifier.")
+    page_number: int = Field(default=0, description="Source page number if available.")
+
+
+class RetrievalStats(BaseModel):
+    """Detailed performance metrics for the retrieval step."""
+    chunks_retrieved: int = Field(description="Number of chunks retrieved.")
+    search_time_ms: float = Field(description="Time spent searching in the vector database.")
+    rerank_time_ms: float = Field(default=0.0, description="Time spent reranking retrieved chunks.")
+
+
 class QueryResponse(BaseResponse):
     """Returned by POST /query on completion."""
     success: bool = True
@@ -175,6 +189,21 @@ class QueryResponse(BaseResponse):
         description="Lexical evidence score measuring answer support in retrieved chunks.",
         examples=[0.82],
     )
+    grounding_score: float = Field(
+        default=0.0,
+        ge=0.0,
+        le=1.0,
+        description="Blended lexical and semantic grounding score.",
+        examples=[0.81],
+    )
+    citations: list[Citation] = Field(
+        default_factory=list,
+        description="List of source citations attributing the generated answer.",
+    )
+    retrieval_stats: Optional[RetrievalStats] = Field(
+        default=None,
+        description="Detailed performance metrics for retrieval.",
+    )
     grounded: bool = Field(
         default=False,
         description="Whether the generated answer is supported by retrieved evidence.",
@@ -191,5 +220,7 @@ class QueryResponse(BaseResponse):
         if self.status in {QueryStatus.FAILED, QueryStatus.NO_RESULTS}:
             self.confidence = 0.0
             self.evidence_score = 0.0
+            self.grounding_score = 0.0
             self.grounded = False
+            self.citations = []
         return self

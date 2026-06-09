@@ -54,10 +54,15 @@ def retrieval_service() -> AsyncMock:
 async def test_query_pipeline_includes_verification_fields(
     retrieval_service: AsyncMock,
 ) -> None:
+    embedder = AsyncMock()
+    v1 = [1.0] * 384
+    embedder.embed.side_effect = [[v1], [v1]]
+    embedder.dimension = 384
+
     service = QueryService(
         retrieval_service=retrieval_service,
         llm_service=LLMService(provider=MockLLM()),
-        verification_service=VerificationService(),
+        verification_service=VerificationService(embedder=embedder),
     )
 
     result = await service.execute_query(
@@ -69,20 +74,22 @@ async def test_query_pipeline_includes_verification_fields(
     assert result.evidence_score >= 0.5
     assert result.grounded is True
     assert result.verification_reason == SUPPORTED_REASON
-    assert result.confidence == pytest.approx(
-        RETRIEVAL_CONFIDENCE_WEIGHT * 0.88
-        + EVIDENCE_CONFIDENCE_WEIGHT * result.evidence_score
-    )
+    assert result.confidence == pytest.approx(0.3 * 0.88 + 0.5 * 1.0 + 0.2 * 1.0)
 
 
 @pytest.mark.asyncio
 async def test_query_response_exposes_verification_metadata(
     retrieval_service: AsyncMock,
 ) -> None:
+    embedder = AsyncMock()
+    v1 = [1.0] * 384
+    embedder.embed.side_effect = [[v1], [v1]]
+    embedder.dimension = 384
+
     service = QueryService(
         retrieval_service=retrieval_service,
         llm_service=LLMService(provider=MockLLM()),
-        verification_service=VerificationService(),
+        verification_service=VerificationService(embedder=embedder),
     )
 
     pipeline_result = await service.execute_query(

@@ -145,3 +145,42 @@ async def test_handles_embedding_failure(vector_store: MagicMock) -> None:
     assert result.error is not None
     assert result.error.code is RetrievalErrorCode.EMBEDDING_FAILED
     vector_store.search.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_retrieval_respects_filters(vector_store: MagicMock) -> None:
+    service = RetrievalService(embedder=PlaceholderEmbedder(), vector_store=vector_store)
+    from app.models.request_models import QueryFilters
+    filters = QueryFilters(document_ids=["doc-1"], tags=["finance"], filename="report.pdf", upload_date="2026-06-09")
+    
+    await service.retrieve("test query", filters=filters)
+    
+    vector_store.search.assert_called_once()
+    assert vector_store.search.call_args.kwargs["filters"] == filters
+
+
+@pytest.mark.asyncio
+async def test_retrieval_fallback_to_global_search(vector_store: MagicMock) -> None:
+    dummy_results = [
+        _make_search_result(
+            chunk_id="doc-1:chunk:0",
+            document_id="doc-1",
+            text="Fallback result.",
+            score=0.88,
+        )
+    ]
+    vector_store.search.side_effect = [[], dummy_results]
+    
+    service = RetrievalService(embedder=PlaceholderEmbedder(), vector_store=vector_store)
+    from app.models.request_models import QueryFilters
+    filters = QueryFilters(document_ids=["doc-2"])
+    
+    result = await service.retrieve("test query", filters=filters)
+    
+    assert result.status == "success"
+    assert len(result.chunks) == 1
+    assert result.chunks[0].text == "Fallback result."
+    assert vector_store.search.call_count == 2
+    assert vector_store.search.call_args_list[0].kwargs["filters"] == filters
+    assert vector_store.search.call_args_list[1].kwargs["filters"] is None
+

@@ -8,50 +8,23 @@ calls LLM generation, verifies evidence, and maps results to API response models
 from __future__ import annotations
 
 import time
-from dataclasses import dataclass
-from enum import Enum
 from uuid import uuid4
 
 from app.models.base import QueryStatus
 from app.models.request_models import QueryRequest
-from app.models.response_models import QueryResponse, RetrievedChunk as ApiRetrievedChunk
+from app.models.response_models import QueryResponse, RetrievedChunk as ApiRetrievedChunk, Citation, RetrievalStats
 from app.services.llm.llm_service import LLMService
+from app.services.orchestration.orchestration_service import OrchestrationService
+from app.services.orchestration.workflow_models import (
+    QueryPipelineError,
+    QueryPipelineErrorCode,
+    QueryPipelineResult,
+)
 from app.services.retrieval_service import (
     RetrievalService,
     RetrievedChunk,
 )
 from app.services.verification.verification_service import VerificationService
-
-
-class QueryPipelineErrorCode(str, Enum):
-    EMPTY_QUERY = "EMPTY_QUERY"
-    RETRIEVAL_FAILED = "RETRIEVAL_FAILED"
-    QDRANT_UNAVAILABLE = "QDRANT_UNAVAILABLE"
-    NO_RESULTS = "NO_RESULTS"
-    GENERATION_FAILED = "GENERATION_FAILED"
-
-
-@dataclass(frozen=True, slots=True)
-class QueryPipelineError:
-    code: QueryPipelineErrorCode
-    message: str
-    detail: str | None = None
-
-
-@dataclass(frozen=True, slots=True)
-class QueryPipelineResult:
-    query_id: str
-    query: str
-    status: str
-    retrieved_chunks: list[ApiRetrievedChunk]
-    chunk_count: int
-    latency_ms: float
-    answer: str = ""
-    confidence: float = 0.0
-    evidence_score: float = 0.0
-    grounded: bool = False
-    verification_reason: str = ""
-    error: QueryPipelineError | None = None
 
 
 class QueryService:
@@ -61,129 +34,64 @@ class QueryService:
         retrieval_service: RetrievalService | None = None,
         llm_service: LLMService | None = None,
         verification_service: VerificationService | None = None,
+        orchestration_service: OrchestrationService | None = None,
     ) -> None:
         self._retrieval = retrieval_service or RetrievalService()
         self._llm = llm_service or LLMService()
         self._verification = verification_service or VerificationService()
+        self._orchestrator = orchestration_service or OrchestrationService(
+            retrieval_service=self._retrieval,
+            llm_service=self._llm,
+            verification_service=self._verification,
+        )
 
     async def execute_query(self, request: QueryRequest) -> QueryPipelineResult:
         started_at = time.perf_counter()
         query_id = f"qry_{uuid4().hex[:12]}"
-        normalized_query = request.query.strip()
 
-        if not normalized_query:
-            return self._error_result(
-                query_id=query_id,
-                query=request.query,
-                status="empty_query",
-                started_at=started_at,
-                error=QueryPipelineError(
-                    code=QueryPipelineErrorCode.EMPTY_QUERY,
-                    message="Query must not be empty.",
-                ),
-            )
-
-        retrieval_result = await self._retrieval.retrieve(
-            normalized_query,
+        state = await self._orchestrator.run(
+            query=request.query,
             top_k=request.top_k,
+            filters=request.filters,
         )
-
-        if retrieval_result.status == "success":
-            api_chunks = [_map_chunk(chunk) for chunk in retrieval_result.chunks]
-            generation = await self._llm.generate_answer(
-                query=retrieval_result.query,
-                chunks=retrieval_result.chunks,
-            )
-            elapsed_ms = (time.perf_counter() - started_at) * 1000.0
-
-            if not generation.success or not generation.answer.strip():
-                return QueryPipelineResult(
-                    query_id=query_id,
-                    query=retrieval_result.query,
-                    status="generation_failed",
-                    retrieved_chunks=api_chunks,
-                    chunk_count=len(api_chunks),
-                    latency_ms=elapsed_ms,
-                    error=QueryPipelineError(
-                        code=QueryPipelineErrorCode.GENERATION_FAILED,
-                        message="Failed to generate an answer from retrieved context.",
-                        detail=generation.metadata.get("error"),
-                    ),
-                )
-
-            verification = await self._verification.verify(
-                query=retrieval_result.query,
-                generated_answer=generation.answer,
-                retrieved_chunks=retrieval_result.chunks,
-            )
-
-            return QueryPipelineResult(
-                query_id=query_id,
-                query=retrieval_result.query,
-                status="success",
-                retrieved_chunks=api_chunks,
-                chunk_count=len(api_chunks),
-                latency_ms=elapsed_ms,
-                answer=generation.answer,
-                confidence=verification.confidence,
-                evidence_score=verification.evidence_score,
-                grounded=verification.grounded,
-                verification_reason=verification.verification_reason,
-            )
 
         elapsed_ms = (time.perf_counter() - started_at) * 1000.0
 
-        if retrieval_result.status == "no_results":
-            return QueryPipelineResult(
-                query_id=query_id,
-                query=retrieval_result.query,
-                status="no_results",
-                retrieved_chunks=[],
-                chunk_count=0,
-                latency_ms=elapsed_ms,
-                error=QueryPipelineError(
-                    code=QueryPipelineErrorCode.NO_RESULTS,
-                    message=retrieval_result.error.message if retrieval_result.error else "No results.",
-                    detail=retrieval_result.error.detail if retrieval_result.error else None,
-                ),
-            )
+        status = state.execution_metadata.get("status", "failed")
+        error = state.execution_metadata.get("error")
 
-        if retrieval_result.status == "qdrant_unavailable":
-            return QueryPipelineResult(
-                query_id=query_id,
-                query=retrieval_result.query,
-                status="qdrant_unavailable",
-                retrieved_chunks=[],
-                chunk_count=0,
-                latency_ms=elapsed_ms,
-                error=QueryPipelineError(
-                    code=QueryPipelineErrorCode.QDRANT_UNAVAILABLE,
-                    message=(
-                        retrieval_result.error.message
-                        if retrieval_result.error
-                        else "Qdrant vector search is unavailable."
-                    ),
-                    detail=retrieval_result.error.detail if retrieval_result.error else None,
-                ),
-            )
+        api_chunks = [_map_chunk(chunk) for chunk in state.retrieved_chunks]
 
-        retrieval_error = retrieval_result.error
+        evidence_score = 0.0
+        grounding_score = 0.0
+        citations = []
+        grounded = False
+        verification_reason = ""
+        if state.verification_result:
+            evidence_score = state.verification_result.evidence_score
+            grounding_score = getattr(state.verification_result, "grounding_score", 0.0)
+            citations = getattr(state.verification_result, "citations", [])
+            grounded = state.verification_result.grounded
+            verification_reason = state.verification_result.verification_reason
+
+        retrieval_stats = state.execution_metadata.get("retrieval_stats")
+
         return QueryPipelineResult(
             query_id=query_id,
-            query=retrieval_result.query,
-            status="retrieval_failed",
-            retrieved_chunks=[],
-            chunk_count=0,
+            query=state.query,
+            status=status,
+            retrieved_chunks=api_chunks,
+            chunk_count=len(api_chunks),
             latency_ms=elapsed_ms,
-            error=QueryPipelineError(
-                code=QueryPipelineErrorCode.RETRIEVAL_FAILED,
-                message=(
-                    retrieval_error.message
-                    if retrieval_error
-                    else "Retrieval failed."
-                ),
-                detail=retrieval_error.detail if retrieval_error else None,
-            ),
+            answer=state.generated_answer,
+            confidence=state.final_confidence,
+            evidence_score=evidence_score,
+            grounding_score=grounding_score,
+            citations=citations,
+            retrieval_stats=retrieval_stats,
+            grounded=grounded,
+            verification_reason=verification_reason,
+            error=error,
         )
 
     @staticmethod
@@ -225,6 +133,9 @@ def to_query_response(result: QueryPipelineResult) -> QueryResponse:
         answer=result.answer,
         confidence=result.confidence,
         evidence_score=result.evidence_score,
+        grounding_score=result.grounding_score,
+        citations=[Citation(**c) for c in result.citations] if result.citations else [],
+        retrieval_stats=RetrievalStats(**result.retrieval_stats) if result.retrieval_stats else None,
         grounded=result.grounded,
         verification_reason=result.verification_reason,
     )

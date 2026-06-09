@@ -4,3 +4,7 @@ pydantic-settings==2.6.1
 python-multipart==0.0.17
 PyMuPDF==1.25.5
 qdrant-client==1.18.0
+sentence-transformers
+python-docx
+pytesseract
+

@@ -1,16 +1,20 @@
 from __future__ import annotations
 
+import time
+import logging
 from dataclasses import dataclass
 from enum import Enum
+from typing import Any
 
-from app.services.embeddings.base_embedder import BaseEmbedder
-from app.services.embeddings.embedding_service import PlaceholderEmbedder
+from app.services.embeddings import EmbeddingService, BaseEmbedder
 from app.services.vector_store.qdrant_store import (
     QdrantStore,
     QdrantStoreError,
     QdrantUnavailableError,
     VectorSearchResult,
 )
+
+logger = logging.getLogger(__name__)
 
 
 class RetrievalErrorCode(str, Enum):
@@ -42,6 +46,8 @@ class RetrievalResult:
     chunks: list[RetrievedChunk]
     status: str = "success"
     error: RetrievalError | None = None
+    search_time_ms: float = 0.0
+    rerank_time_ms: float = 0.0
 
 
 class RetrievalService:
@@ -51,12 +57,20 @@ class RetrievalService:
         embedder: BaseEmbedder | None = None,
         vector_store: QdrantStore | None = None,
     ) -> None:
-        self._embedder = embedder or PlaceholderEmbedder()
-        self._vector_store = vector_store or QdrantStore()
+        self._embedding_service = EmbeddingService(embedder=embedder)
+        self._embedder = self._embedding_service._embedder
+        self._vector_store = vector_store or QdrantStore(vector_dimension=self._embedder.dimension)
 
-    async def retrieve(self, query: str, top_k: int = 5) -> RetrievalResult:
+    async def retrieve(
+        self,
+        query: str,
+        top_k: int = 5,
+        filters: Any | None = None,
+    ) -> RetrievalResult:
+        logger.info(f"Retrieval requested: query='{query}', top_k={top_k}, filters={filters}")
         normalized_query = query.strip()
         if not normalized_query:
+            logger.warning("Empty query submitted for retrieval.")
             return RetrievalResult(
                 query=query,
                 chunks=[],
@@ -70,6 +84,7 @@ class RetrievalService:
         try:
             vectors = await self._embedder.embed([normalized_query])
         except Exception as exc:
+            logger.error(f"Failed to generate query embedding: {exc}")
             return RetrievalResult(
                 query=normalized_query,
                 chunks=[],
@@ -82,6 +97,7 @@ class RetrievalService:
             )
 
         if not vectors or not vectors[0]:
+            logger.error("Embedding service returned no vector for query.")
             return RetrievalResult(
                 query=normalized_query,
                 chunks=[],
@@ -92,12 +108,42 @@ class RetrievalService:
                 ),
             )
 
+        search_time_ms = 0.0
+        rerank_time_ms = 0.0  # Rerank is placeholder/0 for now
+        
         try:
+            start_search = time.perf_counter()
             search_results = self._vector_store.search(
                 query_embedding=vectors[0],
                 top_k=top_k,
+                filters=filters,
             )
+            search_time_ms = (time.perf_counter() - start_search) * 1000.0
+            
+            # Fallback to global search if no results and filters are active
+            if not search_results and filters:
+                has_filter = False
+                if isinstance(filters, dict):
+                    has_filter = any(v for v in filters.values() if v is not None)
+                else:
+                    has_filter = any([
+                        getattr(filters, "document_ids", None),
+                        getattr(filters, "tags", None),
+                        getattr(filters, "filename", None),
+                        getattr(filters, "upload_date", None),
+                    ])
+                if has_filter:
+                    logger.info(f"Retrieval returned 0 chunks with active filters. Falling back to global search.")
+                    start_search = time.perf_counter()
+                    search_results = self._vector_store.search(
+                        query_embedding=vectors[0],
+                        top_k=top_k,
+                        filters=None,
+                    )
+                    search_time_ms = (time.perf_counter() - start_search) * 1000.0
+                    
         except QdrantUnavailableError as exc:
+            logger.error(f"Qdrant unavailable during search: {exc}")
             return RetrievalResult(
                 query=normalized_query,
                 chunks=[],
@@ -109,6 +155,7 @@ class RetrievalService:
                 ),
             )
         except QdrantStoreError as exc:
+            logger.error(f"Qdrant search store failed: {exc}")
             return RetrievalResult(
                 query=normalized_query,
                 chunks=[],
@@ -121,6 +168,7 @@ class RetrievalService:
             )
 
         if not search_results:
+            logger.info(f"No results matched search query '{normalized_query}' after global fallback check.")
             return RetrievalResult(
                 query=normalized_query,
                 chunks=[],
@@ -129,12 +177,17 @@ class RetrievalService:
                     code=RetrievalErrorCode.NO_RESULTS,
                     message="No matching chunks found for query.",
                 ),
+                search_time_ms=search_time_ms,
+                rerank_time_ms=rerank_time_ms,
             )
 
+        logger.info(f"Retrieval query '{normalized_query}' matched {len(search_results)} chunk(s) in {search_time_ms:.2f}ms")
         return RetrievalResult(
             query=normalized_query,
             chunks=[_map_search_result(result) for result in search_results],
             status="success",
+            search_time_ms=search_time_ms,
+            rerank_time_ms=rerank_time_ms,
         )
 
 

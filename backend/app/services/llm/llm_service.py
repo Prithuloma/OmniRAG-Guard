@@ -1,10 +1,13 @@
 from __future__ import annotations
 
+import logging
 from app.services.llm.base_llm import BaseLLM
 from app.services.llm.context_assembler import assemble_context
 from app.services.llm.llm_models import LLMContextChunk, LLMGenerationResult
 from app.services.llm.mock_llm import MockLLM
 from app.services.retrieval_service import RetrievedChunk
+
+logger = logging.getLogger(__name__)
 
 
 class LLMService:
@@ -23,16 +26,23 @@ class LLMService:
         query: str,
         chunks: list[RetrievedChunk],
     ) -> LLMGenerationResult:
+        logger.info(f"LLM answer generation requested: query='{query}', context_chunks={len(chunks)}")
         llm_chunks = [_map_retrieved_chunk(chunk) for chunk in chunks]
         context = assemble_context(llm_chunks)
 
         try:
-            return await self._provider.generate(
+            result = await self._provider.generate(
                 query=query,
                 context=context,
                 chunks=llm_chunks,
             )
+            if result.success:
+                logger.info(f"LLM answer generation succeeded: provider={self.provider_name}, answer_length={len(result.answer)}")
+            else:
+                logger.warning(f"LLM answer generation reported failure: provider={self.provider_name}, error={result.metadata.get('error')}")
+            return result
         except Exception as exc:
+            logger.error(f"LLM answer generation failed: provider={self.provider_name}, error={exc}")
             return LLMGenerationResult(
                 answer="",
                 confidence=0.0,

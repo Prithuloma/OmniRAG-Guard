@@ -76,7 +76,7 @@ class DocumentIngestionPipeline:
         self._parser_dispatcher = parser_dispatcher or ParserDispatcher()
         self._chunker = chunker or TextChunker()
         self._embedder = embedder or EmbeddingService()
-        self._vector_store = vector_store or QdrantStore()
+        self._vector_store = vector_store or QdrantStore(vector_dimension=self._embedder.dimension)
 
     async def ingest(
         self,

@@ -6,6 +6,7 @@ from enum import Enum
 from typing import Any
 
 from app.services.ingestion.parsers.base_parser import BaseParser, ParserType
+from app.services.ingestion.parsers.docx_parser import DocxParser
 from app.services.ingestion.parsers.image_parser import ImageParser
 from app.services.ingestion.parsers.pdf_parser import PDFParser
 from app.services.ingestion.parsers.text_parser import TextParser
@@ -22,13 +23,14 @@ _EXTENSION_TO_PARSER: dict[str, ParserType] = {
     ".jpg": ParserType.IMAGE,
     ".jpeg": ParserType.IMAGE,
     ".txt": ParserType.TEXT,
-    ".docx": ParserType.TEXT,
+    ".docx": ParserType.DOCX,
 }
 
 _PARSER_FACTORY: dict[ParserType, type[BaseParser]] = {
     ParserType.PDF: PDFParser,
     ParserType.IMAGE: ImageParser,
     ParserType.TEXT: TextParser,
+    ParserType.DOCX: DocxParser,
 }
 
 

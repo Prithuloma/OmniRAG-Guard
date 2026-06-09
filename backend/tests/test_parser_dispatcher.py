@@ -13,6 +13,7 @@ from app.services.ingestion.parser_dispatcher import (
     ParserDispatcher,
 )
 from app.services.ingestion.parsers.base_parser import BaseParser, ParserType
+from app.services.ingestion.parsers.docx_parser import DocxParser
 from app.services.ingestion.parsers.image_parser import ImageParser
 from app.services.ingestion.parsers.pdf_parser import PDFParser
 from app.services.ingestion.parsers.text_parser import TextParser
@@ -63,9 +64,9 @@ def dispatcher() -> ParserDispatcher:
         (
             "report.docx",
             "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-            ParserType.TEXT,
+            ParserType.DOCX,
             ".docx",
-            TextParser,
+            DocxParser,
         ),
     ],
 )

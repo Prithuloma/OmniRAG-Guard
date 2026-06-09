@@ -10,6 +10,7 @@ class ParserType(str, Enum):
     PDF = "pdf"
     IMAGE = "image"
     TEXT = "text"
+    DOCX = "docx"
 
 
 class ParseStatus(str, Enum):

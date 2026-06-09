@@ -89,6 +89,7 @@ async def test_successful_retrieval(
     retrieval_service.retrieve.assert_awaited_once_with(
         "What drove revenue growth?",
         top_k=3,
+        filters=request.filters,
     )
 
 

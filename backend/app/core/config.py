@@ -20,6 +20,11 @@ class Settings(BaseSettings):
     QDRANT_URL: str = "http://localhost:6333"
     QDRANT_COLLECTION_NAME: str = "omnirag_documents"
 
+    # ── Embeddings ────────────────────────────────────────
+    EMBEDDING_PROVIDER: str = "sentence-transformers"
+    EMBEDDING_MODEL: str = "sentence-transformers/all-MiniLM-L6-v2"
+    EMBEDDING_DIMENSION: int = 384
+
     # ── Storage ───────────────────────────────────────────
     UPLOAD_DIR: str = "storage/uploads"
 

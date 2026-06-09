@@ -60,10 +60,25 @@ class QueryFilters(BaseModel):
         description="Restrict retrieval to these document IDs.",
         examples=[["doc_abc123", "doc_def456"]],
     )
+    document_id: Optional[str] = Field(
+        default=None,
+        description="Restrict retrieval to this single document ID.",
+        examples=["doc_abc123"],
+    )
     tags: Optional[list[str]] = Field(
         default=None,
         description="Restrict retrieval to documents carrying all these tags.",
         examples=[["finance"]],
+    )
+    filename: Optional[str] = Field(
+        default=None,
+        description="Restrict retrieval to this source filename.",
+        examples=["annual_report.pdf"],
+    )
+    upload_date: Optional[str] = Field(
+        default=None,
+        description="Restrict retrieval to this upload date.",
+        examples=["2026-06-09"],
     )
 
 

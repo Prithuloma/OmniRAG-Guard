@@ -173,6 +173,7 @@ class QdrantStore:
         *,
         query_embedding: list[float],
         top_k: int = 5,
+        filters: Any | None = None,
     ) -> list[VectorSearchResult]:
         if not query_embedding:
             raise EmptyVectorsError("query_embedding must be non-empty")
@@ -189,11 +190,63 @@ class QdrantStore:
         self._ensure_collection_exists()
         client = self._get_client()
 
+        qdrant_filter = None
+        if filters:
+            must_conditions = []
+            document_ids = getattr(filters, "document_ids", None) or (filters.get("document_ids") if isinstance(filters, dict) else None)
+            document_id = getattr(filters, "document_id", None) or (filters.get("document_id") if isinstance(filters, dict) else None)
+            tags = getattr(filters, "tags", None) or (filters.get("tags") if isinstance(filters, dict) else None)
+            filename = getattr(filters, "filename", None) or (filters.get("filename") if isinstance(filters, dict) else None)
+            upload_date = getattr(filters, "upload_date", None) or (filters.get("upload_date") if isinstance(filters, dict) else None)
+
+            if document_id:
+                if not document_ids:
+                    document_ids = [document_id]
+                elif document_id not in document_ids:
+                    document_ids = list(document_ids) + [document_id]
+
+            if document_ids:
+                must_conditions.append(
+                    models.FieldCondition(
+                        key="document_id",
+                        match=models.MatchAny(any=document_ids),
+                    )
+                )
+
+            if tags:
+                for tag in tags:
+                    must_conditions.append(
+                        models.FieldCondition(
+                            key="tags",
+                            match=models.MatchValue(value=tag),
+                        )
+                    )
+
+            if filename:
+                must_conditions.append(
+                    models.FieldCondition(
+                        key="filename",
+                        match=models.MatchValue(value=filename),
+                    )
+                )
+
+            if upload_date:
+                must_conditions.append(
+                    models.FieldCondition(
+                        key="upload_date",
+                        match=models.MatchValue(value=upload_date),
+                    )
+                )
+
+            if must_conditions:
+                qdrant_filter = models.Filter(must=must_conditions)
+
         try:
             response = client.query_points(
                 collection_name=self._collection_name,
                 query=query_embedding,
                 limit=top_k,
+                query_filter=qdrant_filter,
                 with_payload=True,
             )
         except UnexpectedResponse as exc:
@@ -280,10 +333,17 @@ class QdrantStore:
         page_number = chunk.metadata.get("page_number")
         source_file = chunk.metadata.get("file_name", chunk.document_id)
 
-        return {
+        payload = {
             "document_id": chunk.document_id,
             "chunk_id": chunk.chunk_id,
             "page_number": page_number,
             "source_file": source_file,
             "chunk_text": chunk.content,
+            "filename": chunk.metadata.get("file_name") or chunk.metadata.get("filename") or source_file,
+            "tags": chunk.metadata.get("tags") or [],
+            "upload_date": chunk.metadata.get("upload_date"),
         }
+        for k, v in chunk.metadata.items():
+            if k not in payload and v is not None:
+                payload[k] = v
+        return payload

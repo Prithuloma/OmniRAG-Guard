@@ -4,9 +4,11 @@ import hashlib
 import struct
 from typing import Any
 
+from app.core.config import settings
 from app.services.chunking.chunk_models import Chunk
 from app.services.embeddings.base_embedder import BaseEmbedder
 from app.services.embeddings.embedding_models import Embedding, EmbeddingResult
+from app.services.embeddings.sentence_transformer_embedder import SentenceTransformerEmbedder
 
 DEFAULT_EMBEDDING_DIMENSION = 384
 
@@ -45,7 +47,12 @@ class PlaceholderEmbedder(BaseEmbedder):
 
 class EmbeddingService:
     def __init__(self, *, embedder: BaseEmbedder | None = None) -> None:
-        self._embedder = embedder or PlaceholderEmbedder()
+        if embedder is not None:
+            self._embedder = embedder
+        elif settings.EMBEDDING_PROVIDER == "sentence-transformers":
+            self._embedder = SentenceTransformerEmbedder(model_name=settings.EMBEDDING_MODEL)
+        else:
+            self._embedder = PlaceholderEmbedder(dimension=settings.EMBEDDING_DIMENSION)
 
     @property
     def dimension(self) -> int:
