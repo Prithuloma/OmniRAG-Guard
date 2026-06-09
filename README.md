@@ -1,224 +1,430 @@
 # OmniRAG-Guard
 
-Adaptive Multi-Modal RAG with Hallucination Verification and Cost-Aware Model Routing
+> A Verification-Aware Retrieval-Augmented Generation (RAG) System with Evidence Grounding, Confidence Scoring, Source Citations, and Multi-Modal Document Support.
+
+![Python](https://img.shields.io/badge/Python-3.11+-blue)
+![FastAPI](https://img.shields.io/badge/FastAPI-Backend-green)
+![Qdrant](https://img.shields.io/badge/Qdrant-Vector%20DB-orange)
+![Docker](https://img.shields.io/badge/Docker-Containerized-blue)
+![Tests](https://img.shields.io/badge/Tests-98%2B%20Passing-success)
+
+---
 
 ## Overview
 
-OmniRAG-Guard is a production-grade multi-modal Retrieval-Augmented Generation (RAG) system designed to improve reliability, transparency, and efficiency in AI-generated responses.
+OmniRAG-Guard is an end-to-end Retrieval-Augmented Generation (RAG) platform designed to answer user questions from uploaded documents while providing evidence-based verification, confidence scoring, and source citations.
 
-The system retrieves and reasons over:
-- PDFs
-- Images
-- Tables
-- DOCX files
-- Plain text
+Unlike traditional RAG systems that simply retrieve information and generate responses, OmniRAG-Guard introduces a verification layer that evaluates how well generated answers are supported by retrieved evidence.
 
-while reducing hallucinations through:
-- Hybrid semantic and lexical verification,
-- Source citation mapping,
-- Calibrated confidence scoring,
-- And adaptive retrieval filtering.
+The system supports multiple document formats, semantic search using vector embeddings, grounded answer generation, and confidence-aware response validation.
 
 ---
 
 ## Key Features
 
-- **Multi-Modal Parsing**: High-fidelity text extraction for PDF, DOCX, TXT, PNG, JPG, JPEG documents using PyMuPDF, python-docx, and pytesseract OCR.
-- **Provider-Backed Embeddings**: Configurable provider architecture supporting `sentence-transformers` (`all-MiniLM-L6-v2`) and local placeholders.
-- **Scoped Document Retrieval**: Scopes vector queries to specific `document_ids`, `tags`, `filename`, or `upload_date`, with automatic fallback to global search.
-- **Calibrated Confidence**: Confidence calibration blending retrieval similarity, grounding overlap, and chunk consensus.
-- **Hybrid Groundedness Verification**: Fuses lexical token overlap and semantic embedding similarity to classify whether generated answers are supported by retrieved context.
-- **Source Citation Mapping**: Automatically maps claims in the generated response back to specific parent documents, pages, and chunks.
-- **One-Command Service Deployment**: Runs fully containerized backend services via Docker Compose.
+### Multi-Format Document Support
+
+- PDF
+- DOCX
+- TXT
+- PNG
+- JPG
+
+### Automated Ingestion Pipeline
+
+- Document Validation
+- Text Extraction
+- OCR Processing
+- Chunking
+- Embedding Generation
+- Vector Storage
+
+### Retrieval-Augmented Generation
+
+- Semantic Search
+- Context Retrieval
+- LLM-Based Answer Generation
+
+### Verification Layer
+
+- Evidence Scoring
+- Grounding Validation
+- Confidence Calibration
+- Source Attribution
+
+### Infrastructure
+
+- FastAPI Backend
+- Qdrant Vector Database
+- Dockerized Deployment
+- Comprehensive Test Coverage
 
 ---
 
-## Architecture Diagram
+# System Architecture
 
 ```text
-       [User Document Upload]
-                 ↓
-      [Ingestion Pipeline (API)]
-                 ↓
-    [Document Parser Dispatcher]
-     ↙     ↓          ↓        ↘
-  [PDF]  [DOCX]  [Plain Text] [Images (OCR)]
-     ↘     ↓          ↓        ↗
-      [Dynamic Text Chunking]
-                 ↓
-  [Embedding Service (MiniLM-L6)]
-                 ↓
-       [Qdrant Vector Store]
+User Upload
+     │
+     ▼
+ Document Parsing
+     │
+     ▼
+ Text Chunking
+     │
+     ▼
+ Embedding Generation
+     │
+     ▼
+ Qdrant Vector Store
+
+─────────────────────────────────
+
+ User Query
+     │
+     ▼
+ Retrieval Service
+     │
+     ▼
+ LLM Generation
+     │
+     ▼
+ Verification Layer
+     │
+     ▼
+ Response + Citations + Confidence
 ```
 
+---
+
+## Core Components
+
+| Layer | Technology |
+|---------|------------|
+| API Framework | FastAPI |
+| Validation | Pydantic |
+| Vector Database | Qdrant |
+| PDF Parsing | PyMuPDF |
+| DOCX Parsing | python-docx |
+| OCR | pytesseract |
+| Embeddings | Sentence Transformers |
+| Testing | pytest |
+| Containerization | Docker |
+
+---
+
+## Ingestion Pipeline
+
+When a document is uploaded, it passes through a multi-stage ingestion workflow:
+
 ```text
-       [User Query (API)]
-                 ↓
-  [Retrieval & Filtering (Qdrant)]
-                 ↓
-   [Context Assembly Engine]
-                 ↓
-     [LLM Generation Service]
-                 ↓
-  [Verification Service (Scoring)]
-  - Grounding Blending
-  - Citation Extraction
-  - Confidence Calibration
-                 ↓
-     [Formatted Query Response]
+Upload Document
+        ↓
+File Validation
+        ↓
+Parser Dispatcher
+        ↓
+PDF / DOCX / TXT / Image Parsing
+        ↓
+Text Chunking
+        ↓
+Embedding Generation
+        ↓
+Qdrant Vector Storage
+```
+
+### Supported Parsers
+
+| Format | Parser |
+|----------|----------|
+| PDF | PyMuPDF |
+| DOCX | python-docx |
+| TXT | UTF-8 Text Parser |
+| PNG/JPG | pytesseract OCR |
+
+---
+
+## Retrieval & Verification Pipeline
+
+When a user submits a query:
+
+```text
+User Query
+        ↓
+Retrieval Service
+        ↓
+Qdrant Semantic Search
+        ↓
+Retrieved Chunks
+        ↓
+LLM Generation
+        ↓
+Verification Layer
+        ↓
+Response
+```
+
+### Verification Steps
+
+- Lexical overlap analysis
+- Semantic similarity scoring
+- Grounding validation
+- Confidence calculation
+- Citation mapping
+
+---
+
+## End-to-End Workflow
+
+### Document Ingestion
+
+```text
+Upload
+ ↓
+Validate
+ ↓
+Parse
+ ↓
+Chunk
+ ↓
+Embed
+ ↓
+Store in Qdrant
+```
+
+### Question Answering
+
+```text
+Query
+ ↓
+Retrieve
+ ↓
+Generate Answer
+ ↓
+Verify Grounding
+ ↓
+Attach Citations
+ ↓
+Return Response
 ```
 
 ---
 
-## Tech Stack
-
-- **Backend**: FastAPI, Pydantic, Uvicorn, Python 3.12+
-- **AI/ML & Vector DB**: Qdrant, sentence-transformers (`all-MiniLM-L6-v2`)
-- **Parsing & OCR**: PyMuPDF, python-docx, pytesseract (Tesseract OCR)
-- **Deployment**: Docker, Docker Compose
-
----
-
-## Repository Structure
+## Project Structure
 
 ```text
-OmniRAG-Guard/
+backend/
 │
-├── backend/
-│   ├── app/
-│   │   ├── api/          # Route controllers (health, upload, query)
-│   │   ├── core/         # Global config and environment settings
-│   │   ├── models/       # Pydantic request & response schemas
-│   │   ├── services/     # Ingestion, retrieval, LLM, verification, orchestration
-│   │   └── utils/        # General utilities
-│   ├── tests/            # Test suite (98+ tests)
-│   ├── Dockerfile
-│   └── requirements.txt
+├── app/
+│   ├── api/
+│   ├── core/
+│   ├── models/
+│   │
+│   └── services/
+│       ├── ingestion/
+│       ├── embeddings/
+│       ├── retrieval/
+│       ├── verification/
+│       ├── orchestration/
+│       ├── llm/
+│       └── vectorstore/
 │
-├── docker-compose.yml    # Root orchestration compose
-└── README.md
+├── storage/
+├── tests/
+├── Dockerfile
+├── docker-compose.yml
+└── requirements.txt
 ```
 
 ---
 
-## Installation & Setup
+# API Endpoints
 
-### Local Setup
-1. **Install Prerequisites**: Ensure you have Python 3.12+ and [Tesseract OCR](https://github.com/tesseract-ocr/tesseract) installed on your host machine.
-2. **Create Virtual Environment**:
-   ```bash
-   cd backend
-   python -m venv .venv
-   source .venv/bin/activate  # On Windows: .venv\Scripts\activate
-   ```
-3. **Install Dependencies**:
-   ```bash
-   pip install --upgrade pip
-   pip install -r requirements.txt
-   ```
-4. **Environment Variables**: Create a `.env` file in the `backend/` directory (see `.env.example` for reference).
-5. **Run Application**:
-   ```bash
-   uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
-   ```
+## Health Check
 
-### Containerized Setup (Docker Compose)
-Launch the API and Qdrant DB in one command:
-```bash
-docker-compose up --build
+```http
+GET /health
 ```
-* **API Documentation**: `http://localhost:8000/docs`
-* **Qdrant DB Console**: `http://localhost:6333/dashboard`
+
+Example Response:
+
+```json
+{
+  "status": "healthy"
+}
+```
 
 ---
 
-## API Examples
+## Upload Document
 
-### 1. Ingest Document (`POST /v1/upload/`)
-* **Request**: Send a multipart form-data payload containing the file under `file`.
-* **Response**:
-  ```json
-  {
-    "document_id": "doc_a1b2c3d4e5f6",
-    "status": "success",
-    "chunks_created": 12,
-    "vectors_stored": 12
-  }
-  ```
+```http
+POST /v1/upload
+```
 
-### 2. Query Pipeline (`POST /v1/query/`)
-* **Request**:
-  ```json
-  {
-    "query": "What was the revenue growth?",
-    "top_k": 3,
-    "filters": {
-      "tags": ["finance"],
-      "filename": "q3_report.pdf"
+Supported Formats:
+
+```text
+PDF
+DOCX
+TXT
+PNG
+JPG
+```
+
+Example Response:
+
+```json
+{
+  "document_id": "doc_123",
+  "status": "success",
+  "chunks_created": 18,
+  "vectors_stored": 18
+}
+```
+
+---
+
+## Query Documents
+
+```http
+POST /v1/query
+```
+
+Example Request:
+
+```json
+{
+  "query": "What is this document about?"
+}
+```
+
+Example Response:
+
+```json
+{
+  "answer": "The document describes a mock election event conducted to educate students about democratic voting procedures.",
+  "confidence": 0.87,
+  "grounded": true,
+  "evidence_score": 0.82,
+  "citations": [
+    {
+      "document_id": "doc_123",
+      "chunk_id": "chunk_4"
     }
-  }
-  ```
-* **Response**:
-  ```json
-  {
-    "success": true,
-    "message": "Retrieved 1 chunk(s), generated an answer, and completed verification.",
-    "timestamp": "2026-06-09T21:42:01Z",
-    "query_id": "qry_f7e8d9c0b1a2",
-    "query": "What was the revenue growth?",
-    "status": "success",
-    "retrieved_chunks": [
-      {
-        "chunk_id": "doc_a1b2c3d4e5f6:chunk:0",
-        "document_id": "doc_a1b2c3d4e5f6",
-        "page_number": 2,
-        "text": "Revenue increased by 18% YoY in Q3.",
-        "score": 0.91
-      }
-    ],
-    "chunk_count": 1,
-    "latency_ms": 420.5,
-    "answer": "The revenue grew 18% year-over-year.",
-    "confidence": 0.95,
-    "evidence_score": 1.0,
-    "grounding_score": 0.95,
-    "citations": [
-      {
-        "document_id": "doc_a1b2c3d4e5f6",
-        "chunk_id": "doc_a1b2c3d4e5f6:chunk:0",
-        "page_number": 2
-      }
-    ],
-    "retrieval_stats": {
-      "chunks_retrieved": 1,
-      "search_time_ms": 12.5,
-      "rerank_time_ms": 0.0
-    },
-    "grounded": true,
-    "verification_reason": "Answer is supported by retrieved chunks."
-  }
-  ```
-
----
-
-## Test Coverage
-
-The project maintains a rigorous, offline-safe test suite of 98 unit and integration tests. Run tests locally:
-```bash
-cd backend
-python -m pytest
+  ]
+}
 ```
 
 ---
 
-## Future Research Directions
+# Getting Started
 
-1. **Graph-structured Verification**: Map contradiction matrices and logical contradictions using factual entity triple extraction.
-2. **Dynamic Context-Length Routing**: Dynamically select LLM context assembly layout sizes based on query semantic density scores.
-3. **Adaptive Agentic Retry**: Programmatically expand retrieval ranges (e.g. document-set widening) if the hallucination/groundedness score drops below acceptable levels.
+## Clone Repository
+
+```bash
+git clone https://github.com/<your-username>/OmniRAG-Guard.git
+cd OmniRAG-Guard
+```
 
 ---
 
-## License
+## Run with Docker
+
+```bash
+docker compose up
+```
+
+---
+
+## Open Swagger Documentation
+
+```text
+http://localhost:8000/docs
+```
+
+---
+
+# Running Tests
+
+Run all tests:
+
+```bash
+pytest
+```
+
+### Current Test Status
+
+```text
+98+ Passing Tests
+```
+
+---
+
+# Current Status
+
+### Completed
+
+- Multi-format document ingestion
+- PDF parsing
+- DOCX parsing
+- OCR-based image text extraction
+- Chunking pipeline
+- Semantic embeddings
+- Qdrant vector storage
+- Retrieval pipeline
+- LLM answer generation
+- Verification layer
+- Source citations
+- Confidence scoring
+- Dockerized deployment
+- End-to-end API workflows
+
+---
+
+# Team
+
+## Prithuloma
+
+Backend Development
+
+- Ingestion Pipeline
+- Retrieval Pipeline
+- Embedding System
+- Verification Layer
+- Orchestration Layer
+- Qdrant Integration
+- API Development
+
+## Revani
+
+Frontend Development
+
+- User Interface
+- Upload Experience
+- Query Experience
+- Results Visualization
+- Frontend Integration
+
+---
+
+# Future Work
+
+- Advanced Semantic Verification
+- Adaptive Retrieval Strategies
+- Multi-Agent Orchestration
+- Evidence Graph Construction
+- Enhanced Hallucination Detection
+- Research Paper Publication
+
+---
+
+# License
 
 MIT License
+
+---
+
+## Acknowledgements
+
+This project was developed as a collaborative effort to explore modern Retrieval-Augmented Generation (RAG) systems, verification-aware AI pipelines, and trustworthy document question-answering workflows.
