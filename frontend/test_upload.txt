@@ -1,0 +1,5 @@
+This is a test document for OmniRAG-Guard query and upload verification.
+It contains some mock data about company revenue and operations.
+Revenue in Q3 2024 was 50 million USD, growing 15% year-over-year.
+This was primarily driven by new subscription sales in the enterprise sector.
+The operations team also improved margins by 2% through server infrastructure optimization.

@@ -6,6 +6,8 @@ import ConfidenceBar from "@/components/ui/ConfidenceBar";
 import HallucinationBadge from "@/components/ui/HallucinationBadge";
 import EvidencePanel from "@/components/ui/EvidencePanel";
 import { queryRAG } from "@/services/api";
+import { useAuth } from "@/context/AuthContext";
+import { getHistory } from "@/lib/history";
 
 interface Evidence {
   id: string;
@@ -26,6 +28,7 @@ interface Message {
 
 export default function ChatPage() {
   const [messages, setMessages] = useState<Message[]>([]);
+  const { user } = useAuth();
 
   const handleSend = async (content: string) => {
     const userMsg: Message = { id: Date.now().toString(), role: "user", content };
@@ -34,7 +37,17 @@ export default function ChatPage() {
     setMessages((prev) => [...prev, userMsg, loadingMsg]);
 
     try {
-      const data = await queryRAG(content);
+      let docIds: string[] = [];
+      if (user) {
+        docIds = getHistory(user.uid).map((item) => item.documentId);
+      }
+      
+      // If no files are in the user's history, we filter by a dummy non-matching ID
+      // to prevent querying the global database pool
+      const documentIdsFilter = docIds.length > 0 ? docIds : ["doc_none_uploaded_yet"];
+      const filters = { document_ids: documentIdsFilter };
+
+      const data = await queryRAG(content, 3, filters);
 
       const evidence: Evidence[] = (data.retrieved_chunks ?? []).map((c: any) => ({
         id: c.chunk_id,

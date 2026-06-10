@@ -3,6 +3,8 @@
 import { useState, useRef } from "react";
 import { Upload, FileText, X, CheckCircle, Loader } from "lucide-react";
 import { uploadFile } from "@/services/api";
+import { useAuth } from "@/context/AuthContext";
+import { addHistory } from "@/lib/history";
 
 interface UploadedFile {
   id: string;
@@ -16,6 +18,7 @@ interface UploadedFile {
 export default function UploadPage() {
   const [files, setFiles] = useState<UploadedFile[]>([]);
   const inputRef = useRef<HTMLInputElement>(null);
+  const { user } = useAuth();
 
   const addFiles = (fileList: FileList) => {
     const newFiles = Array.from(fileList).map((f) => ({
@@ -36,6 +39,13 @@ export default function UploadPage() {
       try {
         const data = await uploadFile(f.file);
         setFiles((prev) => prev.map((x) => x.id === f.id ? { ...x, status: "done", docId: data.document_id } : x));
+        if (user && data.document_id) {
+          addHistory(user.uid, {
+            documentId: data.document_id,
+            filename: f.name,
+            size: (f.file.size / 1024).toFixed(1) + " KB",
+          });
+        }
       } catch {
         setFiles((prev) => prev.map((x) => x.id === f.id ? { ...x, status: "error" } : x));
       }

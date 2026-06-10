@@ -8,11 +8,11 @@ export async function checkHealth() {
   return res.json();
 }
 
-export async function queryRAG(query: string, topK = 3) {
+export async function queryRAG(query: string, topK = 3, filters?: any) {
   const res = await fetch(`${BASE_URL}/v1/query`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ query, top_k: topK }),
+    body: JSON.stringify({ query, top_k: topK, filters: filters || {} }),
   });
   if (!res.ok) {
     const errorData = await res.json().catch(() => ({}));
