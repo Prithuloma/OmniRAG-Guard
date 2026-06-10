@@ -53,10 +53,11 @@ export default function ChatPage() {
       };
 
       setMessages((prev) => [...prev.slice(0, -1), botMsg]);
-    } catch {
+    } catch (err: any) {
+      const errMsg = err.message || "Error connecting to backend.";
       setMessages((prev) => [
         ...prev.slice(0, -1),
-        { id: Date.now().toString(), role: "assistant", content: "Error connecting to backend.", confidence: 0, grounded: false, evidence: [] },
+        { id: Date.now().toString(), role: "assistant", content: errMsg, confidence: 0, grounded: false, evidence: [] },
       ]);
     }
   };

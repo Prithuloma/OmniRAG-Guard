@@ -2,6 +2,9 @@ const BASE_URL = "http://localhost:8000";
 
 export async function checkHealth() {
   const res = await fetch(`${BASE_URL}/health`);
+  if (!res.ok) {
+    throw new Error(`Health check failed: ${res.status}`);
+  }
   return res.json();
 }
 
@@ -11,6 +14,11 @@ export async function queryRAG(query: string, topK = 3) {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ query, top_k: topK }),
   });
+  if (!res.ok) {
+    const errorData = await res.json().catch(() => ({}));
+    const message = errorData.detail?.message || errorData.detail || "Query failed";
+    throw new Error(message);
+  }
   return res.json();
 }
 
@@ -21,5 +29,10 @@ export async function uploadFile(file: File) {
     method: "POST",
     body: formData,
   });
+  if (!res.ok) {
+    const errorData = await res.json().catch(() => ({}));
+    const message = errorData.detail?.message || errorData.detail || "Upload failed";
+    throw new Error(message);
+  }
   return res.json();
-}
+}
