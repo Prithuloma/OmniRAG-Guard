@@ -2,20 +2,60 @@
 
 import { useAuth } from "@/context/AuthContext";
 import { useState } from "react";
-import { Shield, Loader } from "lucide-react";
+import { Shield, Loader, Mail, Lock, Sparkles, ArrowRight, UserPlus, LogIn } from "lucide-react";
 
 export default function SignIn() {
-  const { loginWithGoogle } = useAuth();
+  const { loginWithGoogle, loginWithEmail, signUpWithEmail } = useAuth();
+  const [isSignUp, setIsSignUp] = useState(false);
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const [loggingIn, setLoggingIn] = useState(false);
   const [error, setError] = useState("");
 
-  const handleSignIn = async () => {
+  const handleEmailAuth = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!email.trim() || !password.trim()) {
+      setError("Please fill in all fields.");
+      return;
+    }
+    if (password.length < 6) {
+      setError("Password must be at least 6 characters.");
+      return;
+    }
+
+    setLoggingIn(true);
+    setError("");
+
+    try {
+      if (isSignUp) {
+        await signUpWithEmail(email, password);
+      } else {
+        await loginWithEmail(email, password);
+      }
+    } catch (err: any) {
+      let msg = err.message || "Authentication failed. Please check credentials.";
+      if (err.code === "auth/user-not-found") {
+        msg = "No user found with this email. Please sign up.";
+      } else if (err.code === "auth/wrong-password") {
+        msg = "Incorrect password. Please try again.";
+      } else if (err.code === "auth/email-already-in-use") {
+        msg = "This email is already registered. Try signing in.";
+      } else if (err.code === "auth/invalid-email") {
+        msg = "Invalid email format.";
+      }
+      setError(msg);
+    } finally {
+      setLoggingIn(false);
+    }
+  };
+
+  const handleGoogleSignIn = async () => {
     setLoggingIn(true);
     setError("");
     try {
       await loginWithGoogle();
     } catch (err: any) {
-      setError(err.message || "Failed to sign in. Please try again.");
+      setError(err.message || "Failed to sign in with Google.");
     } finally {
       setLoggingIn(false);
     }
@@ -24,38 +64,108 @@ export default function SignIn() {
   return (
     <div className="relative min-h-screen flex items-center justify-center bg-slate-950 overflow-hidden font-sans">
       {/* Background decoration */}
-      <div className="absolute top-[-20%] left-[-10%] w-[600px] h-[600px] rounded-full bg-indigo-900/20 blur-[150px] pointer-events-none" />
-      <div className="absolute bottom-[-20%] right-[-10%] w-[600px] h-[600px] rounded-full bg-purple-900/20 blur-[150px] pointer-events-none" />
+      <div className="absolute top-[-30%] left-[-20%] w-[800px] h-[800px] rounded-full bg-violet-950/20 blur-[160px] pointer-events-none" />
+      <div className="absolute bottom-[-30%] right-[-20%] w-[800px] h-[800px] rounded-full bg-indigo-950/20 blur-[160px] pointer-events-none" />
 
       {/* Main Container */}
-      <div className="relative z-10 w-full max-w-md p-8 mx-4 bg-slate-900/60 border border-slate-800/80 rounded-2xl shadow-2xl backdrop-blur-xl transition-all duration-300">
+      <div className="relative z-10 w-full max-w-md p-8 mx-4 bg-slate-900/45 border border-slate-800/60 rounded-2xl shadow-2xl backdrop-blur-xl transition-all duration-300">
         <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center p-3 rounded-2xl bg-indigo-500/10 text-indigo-400 mb-4 border border-indigo-500/20 shadow-inner">
-            <Shield className="w-10 h-10" />
+          <div className="inline-flex items-center justify-center p-3 rounded-2xl bg-indigo-500/10 text-indigo-400 mb-4 border border-indigo-500/20 shadow-inner pulsing-ring">
+            <Shield className="w-8 h-8 text-primary" />
           </div>
-          <h1 className="text-3xl font-bold tracking-tight text-white mb-2">
-            OmniRAG-Guard
+          <h1 className="text-2xl font-bold tracking-tight text-white mb-2 flex items-center justify-center gap-1.5">
+            <span>OmniRAG-Guard</span>
+            <Sparkles className="w-4 h-4 text-amber-400 fill-amber-400/20" />
           </h1>
-          <p className="text-slate-400 text-sm max-w-xs mx-auto">
-            Verification-Aware Retrieval-Augmented Generation for Trustworthy Document QA
+          <p className="text-muted-foreground text-xs max-w-xs mx-auto leading-relaxed">
+            Secure, verified document retrieval. Grounded answers backed by cryptographic consensus.
           </p>
         </div>
 
         {error && (
-          <div className="mb-6 p-4 rounded-xl bg-red-950/45 border border-red-800/50 text-red-300 text-xs text-center">
+          <div className="mb-6 p-3.5 rounded-xl bg-red-950/45 border border-red-800/40 text-red-300 text-xs text-center leading-normal animate-pulse">
             {error}
           </div>
         )}
 
+        <form onSubmit={handleEmailAuth} className="space-y-4 mb-6">
+          <div className="space-y-1">
+            <label className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider pl-1">
+              Email Address
+            </label>
+            <div className="relative">
+              <Mail className="absolute left-3.5 top-3.5 h-4 w-4 text-muted-foreground/60" />
+              <input
+                type="email"
+                placeholder="you@company.com"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                disabled={loggingIn}
+                className="w-full pl-10 pr-4 py-3 bg-slate-950/50 border border-slate-800 rounded-xl text-xs text-white placeholder:text-muted-foreground/45 focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary transition-all"
+                required
+              />
+            </div>
+          </div>
+
+          <div className="space-y-1">
+            <label className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider pl-1">
+              Password
+            </label>
+            <div className="relative">
+              <Lock className="absolute left-3.5 top-3.5 h-4 w-4 text-muted-foreground/60" />
+              <input
+                type="password"
+                placeholder="••••••••"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                disabled={loggingIn}
+                className="w-full pl-10 pr-4 py-3 bg-slate-950/50 border border-slate-800 rounded-xl text-xs text-white placeholder:text-muted-foreground/45 focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary transition-all"
+                required
+              />
+            </div>
+          </div>
+
+          <button
+            type="submit"
+            disabled={loggingIn}
+            className="w-full py-3.5 rounded-xl bg-primary text-primary-foreground font-semibold text-xs tracking-wide shadow-lg shadow-primary/10 hover:opacity-95 active:translate-y-px transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50 disabled:pointer-events-none"
+          >
+            {loggingIn ? (
+              <Loader className="w-3.5 h-3.5 animate-spin" />
+            ) : isSignUp ? (
+              <>
+                <UserPlus className="w-3.5 h-3.5" />
+                <span>Create Workspace Account</span>
+              </>
+            ) : (
+              <>
+                <LogIn className="w-3.5 h-3.5" />
+                <span>Sign In with Credentials</span>
+              </>
+            )}
+          </button>
+        </form>
+
+        {/* Divider */}
+        <div className="relative flex items-center justify-center my-6">
+          <div className="absolute inset-0 flex items-center">
+            <div className="w-full border-t border-slate-800" />
+          </div>
+          <span className="relative px-3 bg-[#0a0d14] text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
+            Or continue with
+          </span>
+        </div>
+
+        {/* Google Provider Button */}
         <button
-          onClick={handleSignIn}
+          onClick={handleGoogleSignIn}
           disabled={loggingIn}
-          className="w-full flex items-center justify-center gap-3 px-5 py-3.5 rounded-xl border border-slate-700 bg-slate-950 hover:bg-slate-900/80 text-white font-medium text-sm transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 hover:border-slate-600 disabled:opacity-75 disabled:cursor-not-allowed group shadow-lg"
+          className="w-full flex items-center justify-center gap-3 px-5 py-3.5 rounded-xl border border-slate-800 bg-slate-950/50 hover:bg-slate-900/60 text-white font-medium text-xs transition-all duration-200 focus:outline-none focus:ring-1 focus:ring-primary hover:border-slate-700 disabled:opacity-75 disabled:cursor-not-allowed group shadow-md"
         >
           {loggingIn ? (
-            <Loader className="w-5 h-5 animate-spin text-indigo-400" />
+            <Loader className="w-4 h-4 animate-spin text-primary" />
           ) : (
-            <svg className="w-5 h-5 group-hover:scale-105 transition-transform duration-200" viewBox="0 0 24 24" width="24" height="24">
+            <svg className="w-4 h-4 group-hover:scale-105 transition-transform duration-200" viewBox="0 0 24 24" width="24" height="24">
               <path
                 d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
                 fill="#4285F4"
@@ -74,11 +184,20 @@ export default function SignIn() {
               />
             </svg>
           )}
-          <span>{loggingIn ? "Signing in..." : "Continue with Google"}</span>
+          <span>Google Workspace Account</span>
         </button>
 
-        <div className="mt-8 text-center text-xs text-slate-500">
-          Secure, authenticated document access powered by Firebase
+        {/* Toggle Account Mode */}
+        <div className="mt-8 text-center">
+          <button
+            onClick={() => {
+              setIsSignUp(!isSignUp);
+              setError("");
+            }}
+            className="text-[11px] font-medium text-primary hover:underline transition-colors"
+          >
+            {isSignUp ? "Already have an account? Sign In" : "Don't have a workspace account? Register"}
+          </button>
         </div>
       </div>
     </div>

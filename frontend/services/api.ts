@@ -35,4 +35,16 @@ export async function uploadFile(file: File) {
     throw new Error(message);
   }
   return res.json();
+}
+
+export async function deleteFile(documentId: string) {
+  const res = await fetch(`${BASE_URL}/v1/upload/${documentId}`, {
+    method: "DELETE",
+  });
+  if (!res.ok) {
+    const errorData = await res.json().catch(() => ({}));
+    const message = errorData.detail?.message || errorData.detail || "Deletion failed";
+    throw new Error(message);
+  }
+  return res.json();
 }

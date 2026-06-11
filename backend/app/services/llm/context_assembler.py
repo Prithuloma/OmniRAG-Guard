@@ -14,6 +14,11 @@ def assemble_context(chunks: list[LLMContextChunk]) -> str:
             f"[Source {index}] document_id={chunk.document_id} "
             f"page={chunk.page_number} score={chunk.score}"
         )
-        sections.append(f"{header}\n{chunk.text.strip()}")
+        sections.append(
+            f"{header}\n"
+            f"<source_text>\n"
+            f"{chunk.text.strip()}\n"
+            f"</source_text>"
+        )
 
     return "\n\n".join(sections)

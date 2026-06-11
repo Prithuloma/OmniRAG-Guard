@@ -329,7 +329,39 @@ cd OmniRAG-Guard
 
 ---
 
+## Configuration & LLM Setup
+
+OmniRAG-Guard supports both a simulated LLM (`MockLLM`) for development and testing, and a real **Google Gemini** integration.
+
+### Settings Configuration
+
+Configuration variables are stored in the `.env` file at the root of the project.
+
+| Variable | Type | Default | Description |
+|---|---|---|---|
+| `LLM_PROVIDER` | `str` | `"mock"` | The active language model provider (`"mock"` or `"gemini"`). |
+| `GEMINI_API_KEY` | `str` | `None` | Your Google Gemini API Key. |
+| `GEMINI_MODEL` | `str` | `"gemini-1.5-flash"` | The Gemini model name to use for text generation. |
+
+### How to obtain a Google Gemini API Key:
+1. Navigate to [Google AI Studio](https://aistudio.google.com/).
+2. Sign in with your Google account.
+3. Click on the **Create API key** button.
+4. Copy the generated key and set it in your environment or add it to the `.env` file:
+   ```env
+   GEMINI_API_KEY=your_gemini_api_key_here
+   LLM_PROVIDER=gemini
+   ```
+
+### Fallback Mechanics & Prompt Injection Isolation
+- **Dynamic Configuration Validation**: If `LLM_PROVIDER` is set to `"gemini"` but `GEMINI_API_KEY` is missing at start time, the system will log a warning and fallback to `MockLLM` dynamically to keep the system operational.
+- **Query-Time Fallback**: If an active Gemini model call fails at runtime (e.g. quota limits, timeouts, invalid key), the request will catch the exception, dynamically resolve the answer using `MockLLM`, and append a warning to the response metadata (`fallback_warning`).
+- **Prompt Injection Isolation**: Retrieved chunks are wrapped inside `<source_text>` XML tags to isolate document context from instructions, mitigating prompt injection risks.
+
+---
+
 ## Run with Docker
+
 
 ```bash
 docker compose up

@@ -20,6 +20,11 @@ class Settings(BaseSettings):
     QDRANT_URL: str = "http://localhost:6333"
     QDRANT_COLLECTION_NAME: str = "omnirag_documents"
 
+    # ── Gemini / LLM ──────────────────────────────────────
+    GEMINI_API_KEY: str | None = None
+    LLM_PROVIDER: str = "mock"
+    GEMINI_MODEL: str = "gemini-1.5-flash"
+
     # ── Embeddings ────────────────────────────────────────
     EMBEDDING_PROVIDER: str = "sentence-transformers"
     EMBEDDING_MODEL: str = "sentence-transformers/all-MiniLM-L6-v2"

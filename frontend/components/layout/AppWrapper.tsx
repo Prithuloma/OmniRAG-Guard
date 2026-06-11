@@ -5,6 +5,7 @@ import Sidebar from "./Sidebar";
 import SignIn from "../auth/SignIn";
 import HistoryDrawer from "./HistoryDrawer";
 import { Loader } from "lucide-react";
+import { Suspense } from "react";
 
 function InnerAppWrapper({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
@@ -26,7 +27,9 @@ function InnerAppWrapper({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="flex min-h-screen">
-      <Sidebar />
+      <Suspense fallback={<div className="w-60 min-h-screen border-r border-border bg-card animate-pulse" />}>
+        <Sidebar />
+      </Suspense>
       <main className="flex-1 overflow-auto bg-background text-foreground">
         {children}
       </main>

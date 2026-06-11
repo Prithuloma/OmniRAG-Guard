@@ -23,13 +23,19 @@ async def health_check() -> JSONResponse:
     
     # 1. Verify Qdrant connection
     try:
-        client = QdrantClient(url=settings.QDRANT_URL, timeout=2.0)
+        client = QdrantClient(url=settings.QDRANT_URL, timeout=1.0)
         client.get_collections()
-        health_status["services"]["qdrant"] = "healthy"
+        health_status["services"]["qdrant"] = "healthy (remote)"
     except Exception as exc:
-        logger.error(f"Health check failed for Qdrant: {exc}")
-        health_status["services"]["qdrant"] = f"unhealthy: {exc}"
-        health_status["status"] = "unhealthy"
+        logger.warning(f"Health check failed for remote Qdrant: {exc}. Trying local fallback.")
+        try:
+            local_client = QdrantClient(path="storage/qdrant_db")
+            local_client.get_collections()
+            health_status["services"]["qdrant"] = "healthy (local fallback)"
+        except Exception as local_exc:
+            logger.error(f"Health check failed for local Qdrant: {local_exc}")
+            health_status["services"]["qdrant"] = f"unhealthy: remote failed ({exc}), local failed ({local_exc})"
+            health_status["status"] = "unhealthy"
 
     # 2. Verify Embedding model availability
     try:

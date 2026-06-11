@@ -258,11 +258,14 @@ def test_search_requires_existing_collection(require_qdrant: str) -> None:
 
 
 def test_unavailable_qdrant_raises() -> None:
+    from unittest.mock import patch
     store = QdrantStore(
         url="http://localhost:6399",
         collection_name="omnirag_unreachable",
         vector_dimension=DEFAULT_EMBEDDING_DIMENSION,
     )
 
-    with pytest.raises(QdrantUnavailableError):
-        store.initialize_collection()
+    with patch("app.services.vector_store.qdrant_store.QdrantClient", side_effect=Exception("Qdrant unavailable")):
+        with pytest.raises(QdrantUnavailableError):
+            store.initialize_collection()
+

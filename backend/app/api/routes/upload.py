@@ -9,6 +9,7 @@ from __future__ import annotations
 import logging
 from fastapi import APIRouter, HTTPException, UploadFile, status
 
+from app.core.config import settings
 from app.models.response_models import UploadIngestionResponse
 from app.services.ingestion_service import (
     UploadIngestionErrorCode,
@@ -83,3 +84,42 @@ async def upload_file(file: UploadFile) -> UploadIngestionResponse:
         chunks_created=result.chunks_created,
         vectors_stored=result.vectors_stored,
     )
+
+
+@router.delete(
+    "/{document_id}",
+    status_code=status.HTTP_200_OK,
+    summary="Delete an uploaded document and its vector embeddings",
+)
+async def delete_document(document_id: str):
+    logger.info(f"Received delete request for document_id={document_id}")
+
+    # 1. Delete vectors from Qdrant
+    try:
+        from app.services.vector_store.qdrant_store import QdrantStore
+        store = QdrantStore(vector_dimension=settings.EMBEDDING_DIMENSION)
+        store.delete_document(document_id=document_id)
+        logger.info(f"Successfully deleted vectors for document_id={document_id} from Qdrant")
+    except Exception as exc:
+        logger.error(f"Failed to delete Qdrant vectors for document_id={document_id}: {exc}")
+
+    # 2. Delete files from storage
+    from pathlib import Path
+    upload_dir = Path(settings.UPLOAD_DIR)
+    if not upload_dir.is_absolute():
+        backend_root = Path(__file__).resolve().parents[3]
+        upload_dir = backend_root / upload_dir
+
+    deleted_files_count = 0
+    for p in upload_dir.glob(f"{document_id}_*"):
+        try:
+            p.unlink()
+            deleted_files_count += 1
+            logger.info(f"Deleted file from storage: {p.name}")
+        except OSError as exc:
+            logger.error(f"Failed to delete file {p.name} from storage: {exc}")
+
+    return {
+        "success": True,
+        "message": f"Successfully deleted document {document_id} and {deleted_files_count} associated file(s).",
+    }

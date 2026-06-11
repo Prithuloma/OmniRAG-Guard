@@ -69,17 +69,28 @@ class QdrantStore:
             return self._client
 
         try:
-            self._client = QdrantClient(url=self._url, timeout=5.0)
+            # 1. Try remote connection with small timeout check
+            client = QdrantClient(url=self._url, timeout=1.0)
+            client.get_collections()
+            self._client = client
             return self._client
-        except Exception as exc:
-            raise QdrantUnavailableError(
-                f"Unable to connect to Qdrant at {self._url}"
-            ) from exc
+        except Exception as exc1:
+            # 2. Fall back to local file-based embedded Qdrant instance
+            import logging
+            logging.getLogger(__name__).warning(
+                f"Qdrant daemon at {self._url} not running. Falling back to local embedded vector store at storage/qdrant_db"
+            )
+            try:
+                self._client = QdrantClient(path="storage/qdrant_db")
+                return self._client
+            except Exception as exc2:
+                raise QdrantUnavailableError(
+                    f"Qdrant remote and local embedded engines are both unavailable: {exc1} / {exc2}"
+                ) from exc2
 
     def initialize_collection(self) -> None:
-        client = self._get_client()
-
         try:
+            client = self._get_client()
             if client.collection_exists(self._collection_name):
                 return
 
@@ -98,9 +109,8 @@ class QdrantStore:
             ) from exc
 
     def _ensure_collection_exists(self) -> None:
-        client = self._get_client()
-
         try:
+            client = self._get_client()
             if not client.collection_exists(self._collection_name):
                 raise CollectionMissingError(
                     f"Collection '{self._collection_name}' does not exist"
@@ -111,6 +121,7 @@ class QdrantStore:
             raise QdrantUnavailableError(
                 f"Unable to verify collection '{self._collection_name}'"
             ) from exc
+
 
     def upsert_chunks(
         self,
