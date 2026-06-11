@@ -388,7 +388,7 @@ pytest
 ### Current Test Status
 
 ```text
-98+ Passing Tests
+101 Passing Tests (100% passing offline)
 ```
 
 ---
@@ -397,20 +397,18 @@ pytest
 
 ### Completed
 
-- Multi-format document ingestion
-- PDF parsing
-- DOCX parsing
-- OCR-based image text extraction
-- Chunking pipeline
-- Semantic embeddings
-- Qdrant vector storage
-- Retrieval pipeline
-- LLM answer generation
-- Verification layer
-- Source citations
-- Confidence scoring
-- Dockerized deployment
-- End-to-end API workflows
+- **Premium AI SaaS UI Overhaul**: Beautiful space-slate dark mode, custom scrollbars, and micro-animations mirroring Notion AI and Perplexity.
+- **Conversational Chat Interface**: User and assistant message bubbles with automated scroll, multiline inputs (Enter/Shift+Enter), and visual RAG step progress tracking.
+- **Google Gemini SDK Integration**: Added real `GeminiLLM` provider using strict retrieval-only grounding rules (answers only using retrieval context; rejects queries with the explicit fallback string when context is insufficient).
+- **Dynamic Configuration & Runtime Fallback**: Automatic `MockLLM` fallback at startup if the API key is missing or at query-time if Gemini experiences errors (timeout, quota issues), adding warnings directly to response metadata.
+- **Context Injection Prevention**: Wrapped retrieved source texts inside `<source_text>` XML tags.
+- **Diagnostic Verification Panel**: Grounding indicators (Grounded/Partially Grounded/Low Evidence) with interactive citation highlights and keyword match markings.
+- **Secure Authentication**: Credentials sign-in (email/password) and Google Sign-in with session persistent conversation history drawer.
+- **Control Dashboard & History drawer**: Indicators for document size, chunk metrics, average latencies, knowledge base grids, pin/unpin options, and database purge actions.
+- **SQLite Embedded Vector Database**: Integrated automatic local Sqlite-based vector database fallback when the Qdrant server is offline.
+- **Multi-format Ingestion & OCR**: PDF, DOCX, TXT, and PNG/JPG OCR-based image text extraction.
+- **Comprehensive Offline Mock Testing**: Fully simulated Gemini model responses, connection validation, and fallback mechanisms in python test cases.
+
 
 ---
 
