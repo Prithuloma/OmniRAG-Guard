@@ -137,6 +137,7 @@ class OrchestrationService:
             )
         else:
             state.generated_answer = generation.answer
+            state.execution_metadata["llm_metadata"] = generation.metadata
 
         return state
 
@@ -180,14 +181,74 @@ class OrchestrationService:
         state = WorkflowState(query=query, filters=filters)
         state.execution_metadata["started_at"] = time.perf_counter()
 
+        # Detect document-level summarization queries
+        is_summary = False
+        q_lower = query.lower().strip()
+        summary_keywords = ["summarize", "summary", "overview", "explain this", "key points", "takeaway", "takeaways"]
+        if any(k in q_lower for k in summary_keywords):
+            is_summary = True
+        state.execution_metadata["is_summary"] = is_summary
+
         # Step 1: Retrieval
-        state = await self.retrieve_step(state, top_k=top_k)
+        t0 = time.perf_counter()
+        actual_top_k = 25 if is_summary else top_k
+        state = await self.retrieve_step(state, top_k=actual_top_k)
+        state.execution_metadata["retrieval_time_ms"] = (time.perf_counter() - t0) * 1000.0
 
         # Step 2: Generation
+        t1 = time.perf_counter()
         state = await self.generate_step(state)
+        state.execution_metadata["generation_time_ms"] = (time.perf_counter() - t1) * 1000.0
 
         # Step 3: Verification
+        t2 = time.perf_counter()
         state = await self.verify_step(state)
+        state.execution_metadata["verification_time_ms"] = (time.perf_counter() - t2) * 1000.0
+
+        # Step 4: Self-Correction Refinement Loop
+        state.execution_metadata["self_correction_triggered"] = False
+        state.execution_metadata["refinement_time_ms"] = 0.0
+
+        import logging
+        logger = logging.getLogger(__name__)
+
+        if state.verification_result and (not state.verification_result.grounded or any(c.get("status") == "ungrounded" for c in state.verification_result.claims)):
+            ungrounded_claims = [c for c in state.verification_result.claims if c.get("status") == "ungrounded"]
+            if ungrounded_claims:
+                logger.info(f"Low grounding score or ungrounded claims detected. Triggering self-correction refinement.")
+                t_refine_start = time.perf_counter()
+                
+                refinement_warnings = "\n".join([f"- \"{c.get('text')}\"" for c in ungrounded_claims])
+                refine_query = (
+                    f"{query}\n\n"
+                    f"[REFINEMENT FEEDBACK]\n"
+                    f"Your previous response failed verification checks because the following statements are unsupported by the context:\n"
+                    f"{refinement_warnings}\n\n"
+                    f"Please revise the response. Modify or completely remove these unsupported assertions. Ensure every remaining statement is fully grounded in the retrieved context blocks."
+                )
+                
+                try:
+                    generation = await self._llm.generate_answer(
+                        query=refine_query,
+                        chunks=state.retrieved_chunks,
+                    )
+                    if generation.success and generation.answer.strip():
+                        state.generated_answer = generation.answer
+                        state.execution_metadata["llm_metadata"] = generation.metadata
+                        state.execution_metadata["self_correction_triggered"] = True
+                        
+                        # Re-verify the corrected response
+                        verification = await self._verification.verify(
+                            query=query,
+                            generated_answer=state.generated_answer,
+                            retrieved_chunks=state.retrieved_chunks,
+                        )
+                        state.verification_result = verification
+                        state.final_confidence = verification.confidence
+                except Exception as exc:
+                    logger.error(f"Self-correction refinement failed: {exc}")
+                
+                state.execution_metadata["refinement_time_ms"] = (time.perf_counter() - t_refine_start) * 1000.0
 
         # Final latency calculation
         started_at = state.execution_metadata.get("started_at")

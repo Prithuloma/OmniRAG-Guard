@@ -53,14 +53,45 @@ class GeminiLLM(BaseLLM):
                 metadata={"strategy": "no_context"},
             )
 
-        system_instruction = (
-            "You are a retrieval-augmented assistant.\n"
-            "Answer the user's question ONLY using the provided retrieved context blocks wrapped in <source_text> tags.\n"
-            "Do not hallucinate or answer from your own knowledge.\n"
-            "If the answer cannot be found in the supplied context, explicitly state: "
-            "\"The uploaded documents do not contain enough information to answer this question.\"\n"
-            "Rely solely on the facts provided in the context. Do not mention or reference any facts not explicitly present in the context."
-        )
+        is_summary = False
+        q_lower = query.lower().strip()
+        summary_keywords = ["summarize", "summary", "overview", "explain this", "key points", "takeaway", "takeaways"]
+        if any(k in q_lower for k in summary_keywords):
+            is_summary = True
+
+        if is_summary:
+            system_instruction = (
+                "You are a document intelligence assistant. Your task is to summarize the entire provided context.\n"
+                "Answer ONLY using the provided retrieved context blocks wrapped in <source_text> tags.\n\n"
+                "Formatting Rules:\n"
+                "1. ALWAYS begin your response with a 2-4 word conversation title wrapped in <title>Title Here</title>, e.g., <title>BFS vs DFS</title>.\n"
+                "2. Format the response exactly as follows:\n\n"
+                "# Document Summary\n\n"
+                "## Overview\n"
+                "[A concise 2-4 paragraph overview of the entire document context]\n\n"
+                "## Key Topics\n"
+                "[Bullet points of the major concepts covered in the document]\n\n"
+                "## Important Takeaways\n"
+                "[Bullet points of concise actionable or memorable takeaways from the document]\n\n"
+                "## Conclusion\n"
+                "[A short concluding paragraph that ties everything together]\n\n"
+                "3. Include precise inline citation markers like [1], [2], etc., immediately after statements. Do not create a separate 'Sources' section yourself.\n"
+                "4. NEVER output any meta-commentary, correction acknowledgments, or references to refinement feedback (such as 'Here is the revised response', or '[REFINEMENT FEEDBACK]'). Write only the clean, final document summary directly."
+            )
+        else:
+            system_instruction = (
+                "You are a retrieval-augmented assistant.\n"
+                "Answer the user's question ONLY using the provided retrieved context blocks wrapped in <source_text> tags.\n"
+                "Do not hallucinate or answer from your own knowledge.\n"
+                "If the answer cannot be found in the supplied context, explicitly state: "
+                "\"The uploaded documents do not contain enough information to answer this question.\"\n"
+                "Rely solely on the facts provided in the context. Do not mention or reference any facts not explicitly present in the context.\n\n"
+                "Formatting Rules:\n"
+                "1. ALWAYS begin your response with a 2-4 word conversation title wrapped in <title>Title Here</title>, e.g., <title>BFS vs DFS</title>.\n"
+                "2. Format the response beautifully using Markdown with logical headings (e.g. ### Key Concepts, ### Analysis, etc.), short paragraphs, and bullet points.\n"
+                "3. Include precise inline citation markers like [1], [2], etc., immediately after any statement referencing context block '[Source 1]', '[Source 2]', etc.\n"
+                "4. NEVER output any meta-commentary, correction acknowledgments, or references to refinement feedback (such as 'Here is the revised response', or '[REFINEMENT FEEDBACK]'). Write only the clean, final response directly."
+            )
 
         prompt = (
             f"Retrieved context:\n{context}\n\n"
@@ -83,7 +114,16 @@ class GeminiLLM(BaseLLM):
                 generation_config=generation_config
             )
             
-            answer = response.text.strip() if response.text else ""
+            raw_answer = response.text.strip() if response.text else ""
+            import re
+            title = "Untitled Chat"
+            answer = raw_answer
+            
+            title_match = re.search(r"<title>(.*?)</title>", raw_answer, re.DOTALL)
+            if title_match:
+                title = title_match.group(1).strip()
+                answer = re.sub(r"<title>.*?</title>", "", raw_answer, flags=re.DOTALL).strip()
+                
             if not answer:
                 answer = "The uploaded documents do not contain enough information to answer this question."
 
@@ -97,6 +137,7 @@ class GeminiLLM(BaseLLM):
                 metadata={
                     "model": self._model_name,
                     "chunk_count": len(chunks),
+                    "title": title,
                 },
             )
         except Exception as exc:

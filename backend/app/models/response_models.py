@@ -96,6 +96,12 @@ class UploadIngestionResponse(BaseModel):
         description="Number of vectors upserted into the vector store.",
         examples=[12],
     )
+    pages_processed: int = Field(
+        default=0,
+        ge=0,
+        description="Number of pages processed from the document.",
+        examples=[5],
+    )
 
 
 # ── Query ─────────────────────────────────────────────────────────────────────
@@ -134,6 +140,30 @@ class Citation(BaseModel):
     document_id: str = Field(description="Parent document identifier.")
     chunk_id: str = Field(description="Source chunk identifier.")
     page_number: int = Field(default=0, description="Source page number if available.")
+
+
+class ClaimCitation(BaseModel):
+    """Citation metadata for a specific claim sentence."""
+    document_id: str = Field(description="Parent document identifier.")
+    page_number: int = Field(default=0, description="Source page number.")
+    source_index: int = Field(description="1-based index in the parent citations list.")
+
+
+class ClaimVerification(BaseModel):
+    """Grounding quality details for a single claim sentence."""
+    text: str = Field(description="The exact text of the claim sentence.")
+    grounding_score: float = Field(description="Sentence grounding score between 0.0 and 1.0.")
+    status: str = Field(description="Verification status: grounded, partially_grounded, or ungrounded.")
+    citations: list[ClaimCitation] = Field(default_factory=list, description="Citations supporting this claim.")
+
+
+class ConflictDetail(BaseModel):
+    """Programmatic warning detail regarding contradictory source statements."""
+    source_a: str = Field(description="Source document identifier or filename A.")
+    source_b: str = Field(description="Source document identifier or filename B.")
+    page_a: int = Field(default=1, description="Page number in document A.")
+    page_b: int = Field(default=1, description="Page number in document B.")
+    description: str = Field(description="Detailed text explaining the conflict/contradiction.")
 
 
 class RetrievalStats(BaseModel):
@@ -213,6 +243,50 @@ class QueryResponse(BaseResponse):
         description="Human-readable explanation of the verification outcome.",
         examples=["Answer is supported by retrieved chunks."],
     )
+    conversation_title: str = Field(
+        default="",
+        description="Automatically generated 2-4 word title for this conversation.",
+    )
+    retrieval_time_ms: float = Field(
+        default=0.0,
+        description="Time spent retrieving document context in milliseconds.",
+    )
+    generation_time_ms: float = Field(
+        default=0.0,
+        description="Time spent generating answer in milliseconds.",
+    )
+    verification_time_ms: float = Field(
+        default=0.0,
+        description="Time spent verifying answer in milliseconds.",
+    )
+    embedding_model: str = Field(
+        default="",
+        description="Name of the embedding model used.",
+    )
+    llm_model: str = Field(
+        default="",
+        description="Name of the LLM model used.",
+    )
+    semantic_similarity: float = Field(
+        default=0.0,
+        description="Max semantic similarity score between answer and sources.",
+    )
+    lexical_overlap: float = Field(
+        default=0.0,
+        description="Lexical overlap score between answer and sources.",
+    )
+    consensus_score: float = Field(
+        default=0.0,
+        description="Consensus score between retrieved chunks.",
+    )
+    claims: list[ClaimVerification] = Field(
+        default_factory=list,
+        description="Claim-level grounding details.",
+    )
+    conflicts: list[ConflictDetail] = Field(
+        default_factory=list,
+        description="List of contradictions or conflicts discovered between chunks.",
+    )
 
     @model_validator(mode="after")
     def _clamp_confidence_on_failed(self) -> "QueryResponse":
@@ -223,4 +297,6 @@ class QueryResponse(BaseResponse):
             self.grounding_score = 0.0
             self.grounded = False
             self.citations = []
+            self.claims = []
+            self.conflicts = []
         return self

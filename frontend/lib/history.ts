@@ -6,6 +6,7 @@ export interface HistoryItem {
   pinned?: boolean;
   status?: "queued" | "uploading" | "done" | "error";
   chunks?: number;
+  pages?: number;
 }
 
 const HISTORY_KEY_PREFIX = "omnirag_history_";

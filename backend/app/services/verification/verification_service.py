@@ -64,6 +64,8 @@ class VerificationService:
                 grounding_score=0.0,
                 citations=[],
                 retrieval_confidence=retrieval_confidence,
+                claims=[],
+                conflicts=[],
                 metadata={"strategy": "lexical_overlap"},
             )
 
@@ -80,6 +82,8 @@ class VerificationService:
                 grounding_score=0.0,
                 citations=[],
                 retrieval_confidence=retrieval_confidence,
+                claims=[],
+                conflicts=[],
                 metadata={"strategy": "lexical_overlap"},
             )
 
@@ -99,6 +103,7 @@ class VerificationService:
             semantic_score = lexical_score
             similarities = [lexical_score] * len(retrieved_chunks)
             chunk_consensus = lexical_score
+            chunk_vecs = []
 
         # 3. Blended Grounding Score (Phase 6)
         grounding_score = 0.5 * lexical_score + 0.5 * semantic_score
@@ -134,7 +139,126 @@ class VerificationService:
                 "page_number": chunk.page_number,
             })
 
-        logger.info(f"Verification completed: grounded={grounded}, grounding_score={grounding_score:.4f}, confidence={confidence:.4f}, citations={len(citations)}")
+        # 6. Claim-Level Grounding Visualizer & Highlights
+        import re
+        sentence_pattern = re.compile(r'(?<!\w\.\w.)(?<![A-Z][a-z]\.)(?<=\.|\?|!)\s')
+        raw_claims = [s.strip() for s in sentence_pattern.split(normalized_answer) if s.strip()]
+        
+        def clean_claim_text(text: str) -> str:
+            t = re.sub(r'\*\*|\*', '', text)
+            t = re.sub(r'^(?:[-\*\+]\s+|\d+\.\s+)', '', t.strip())
+            return t.strip()
+
+        claims_list = []
+        for c_idx, raw_claim in enumerate(raw_claims):
+            if raw_claim.startswith("#"):
+                continue
+            claim_text = clean_claim_text(raw_claim)
+            if not claim_text:
+                continue
+
+            claim_lexical = compute_lexical_evidence_score(claim_text, chunk_texts)
+            try:
+                if chunk_vecs:
+                    claim_vec = (await self._embedder.embed([claim_text]))[0]
+                    claim_similarities = [cosine_similarity(claim_vec, cv) for cv in chunk_vecs]
+                    max_claim_sim = max(claim_similarities) if claim_similarities else 0.0
+                else:
+                    max_claim_sim = claim_lexical
+                    claim_similarities = [claim_lexical] * len(retrieved_chunks)
+            except Exception as e:
+                logger.warning(f"Failed to embed claim '{claim_text}': {e}")
+                max_claim_sim = claim_lexical
+                claim_similarities = [claim_lexical] * len(retrieved_chunks)
+
+            claim_grounding = 0.5 * claim_lexical + 0.5 * max_claim_sim
+            if claim_grounding >= 0.55:
+                claim_status = "grounded"
+            elif claim_grounding >= 0.35:
+                claim_status = "partially_grounded"
+            else:
+                claim_status = "ungrounded"
+
+            claim_citations = []
+            for idx, (chunk, sim) in enumerate(zip(retrieved_chunks, claim_similarities)):
+                words_chunk = set(chunk.text.lower().split())
+                words_claim = set(claim_text.lower().split())
+                intersection = words_chunk.intersection(words_claim)
+                if sim >= 0.35 or len(intersection) >= 3 or (chunk.text.lower() in claim_text.lower()):
+                    claim_citations.append({
+                        "document_id": chunk.document_id,
+                        "page_number": chunk.page_number,
+                        "source_index": idx + 1,
+                    })
+
+            if not claim_citations and retrieved_chunks and max_claim_sim >= 0.2:
+                max_sim_idx = claim_similarities.index(max(claim_similarities)) if claim_similarities else 0
+                chunk = retrieved_chunks[max_sim_idx]
+                claim_citations.append({
+                    "document_id": chunk.document_id,
+                    "page_number": chunk.page_number,
+                    "source_index": max_sim_idx + 1,
+                })
+
+            claims_list.append({
+                "text": raw_claim,
+                "grounding_score": claim_grounding,
+                "status": claim_status,
+                "citations": claim_citations,
+            })
+
+        # 7. Contradiction & Conflict Detector
+        conflicts = []
+        numbers_pattern = re.compile(r'\b\d+(?:\.\d+)?%?\b')
+        negation_words = {"no", "not", "never", "declined", "failed", "opposite", "contradict", "decrease", "reduce"}
+
+        for i in range(len(retrieved_chunks)):
+            for j in range(i + 1, len(retrieved_chunks)):
+                chunk_a = retrieved_chunks[i]
+                chunk_b = retrieved_chunks[j]
+
+                if chunk_a.document_id == chunk_b.document_id and chunk_a.page_number == chunk_b.page_number:
+                    continue
+
+                try:
+                    sim = cosine_similarity(chunk_vecs[i], chunk_vecs[j]) if chunk_vecs else 0.0
+                except Exception:
+                    sim = 0.0
+
+                if sim >= 0.5:
+                    words_a = {w.lower() for w in chunk_a.text.split() if len(w) > 4}
+                    words_b = {w.lower() for w in chunk_b.text.split() if len(w) > 4}
+                    overlap_words = words_a.intersection(words_b)
+
+                    if len(overlap_words) >= 2:
+                        nums_a = set(numbers_pattern.findall(chunk_a.text))
+                        nums_b = set(numbers_pattern.findall(chunk_b.text))
+
+                        if nums_a and nums_b and nums_a != nums_b:
+                            conflicts.append({
+                                "source_a": chunk_a.document_id,
+                                "source_b": chunk_b.document_id,
+                                "page_a": chunk_a.page_number,
+                                "page_b": chunk_b.page_number,
+                                "description": f"Conflicting numeric data regarding {', '.join(list(overlap_words)[:2])}: "
+                                               f"'{chunk_a.text[:60]}...' mentions {list(nums_a)} whereas "
+                                               f"'{chunk_b.text[:60]}...' mentions {list(nums_b)}."
+                            })
+                        else:
+                            has_neg_a = any(w in words_a for w in negation_words)
+                            has_neg_b = any(w in words_b for w in negation_words)
+                            if has_neg_a != has_neg_b:
+                                conflicts.append({
+                                    "source_a": chunk_a.document_id,
+                                    "source_b": chunk_b.document_id,
+                                    "page_a": chunk_a.page_number,
+                                    "page_b": chunk_b.page_number,
+                                    "description": f"Semantic polarity conflict regarding {', '.join(list(overlap_words)[:2])}: "
+                                                   f"One source states: '{chunk_a.text[:55]}...' "
+                                                   f"while the other states: '{chunk_b.text[:55]}...'."
+                                })
+
+        logger.info(f"Verification completed: grounded={grounded}, grounding_score={grounding_score:.4f}, confidence={confidence:.4f}, claims={len(claims_list)}, conflicts={len(conflicts)}")
         return VerificationResult(
             evidence_score=lexical_score,
             grounded=grounded,
@@ -143,6 +267,8 @@ class VerificationService:
             grounding_score=grounding_score,
             citations=citations,
             retrieval_confidence=retrieval_confidence,
+            claims=claims_list,
+            conflicts=conflicts,
             metadata={
                 "strategy": "hybrid_lexical_semantic",
                 "grounded_threshold": self._grounded_threshold,

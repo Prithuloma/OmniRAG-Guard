@@ -146,3 +146,15 @@ vite.config.ts.timestamp-*
 storage/
 backend/storage/
 
+# Executables
+*.exe
+
+# Python cache files
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache/
+.venv/
+backend/.venv/
+

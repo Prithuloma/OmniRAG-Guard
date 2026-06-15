@@ -17,6 +17,7 @@ interface UploadedFile {
   docId?: string;
   chunksCreated?: number;
   vectorsStored?: number;
+  pagesProcessed?: number;
 }
 
 export default function UploadPage() {
@@ -91,6 +92,7 @@ export default function UploadPage() {
                   docId: responseData.document_id,
                   chunksCreated: responseData.chunks_created,
                   vectorsStored: responseData.vectors_stored,
+                  pagesProcessed: responseData.pages_processed,
                 }
               : x
           )
@@ -102,6 +104,7 @@ export default function UploadPage() {
             filename: f.name,
             size: (f.file.size / 1024).toFixed(1) + " KB",
             chunks: responseData.chunks_created,
+            pages: responseData.pages_processed,
           });
         }
       } catch {

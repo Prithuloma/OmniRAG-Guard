@@ -13,4 +13,6 @@ class VerificationResult:
     grounding_score: float = 0.0
     citations: list[dict[str, Any]] = field(default_factory=list)
     retrieval_confidence: float = 0.0
+    claims: list[dict[str, Any]] = field(default_factory=list)
+    conflicts: list[dict[str, Any]] = field(default_factory=list)
     metadata: dict[str, Any] = field(default_factory=dict)

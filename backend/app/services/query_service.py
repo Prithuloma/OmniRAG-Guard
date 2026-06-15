@@ -12,7 +12,14 @@ from uuid import uuid4
 
 from app.models.base import QueryStatus
 from app.models.request_models import QueryRequest
-from app.models.response_models import QueryResponse, RetrievedChunk as ApiRetrievedChunk, Citation, RetrievalStats
+from app.models.response_models import (
+    QueryResponse,
+    RetrievedChunk as ApiRetrievedChunk,
+    Citation,
+    RetrievalStats,
+    ClaimVerification,
+    ConflictDetail,
+)
 from app.services.llm.llm_service import LLMService
 from app.services.orchestration.orchestration_service import OrchestrationService
 from app.services.orchestration.workflow_models import (
@@ -67,14 +74,48 @@ class QueryService:
         citations = []
         grounded = False
         verification_reason = ""
+        claims = []
+        conflicts = []
         if state.verification_result:
             evidence_score = state.verification_result.evidence_score
             grounding_score = getattr(state.verification_result, "grounding_score", 0.0)
             citations = getattr(state.verification_result, "citations", [])
             grounded = state.verification_result.grounded
             verification_reason = state.verification_result.verification_reason
+            claims = getattr(state.verification_result, "claims", [])
+            conflicts = getattr(state.verification_result, "conflicts", [])
 
         retrieval_stats = state.execution_metadata.get("retrieval_stats")
+
+        # Get timing metrics
+        retrieval_time_ms = state.execution_metadata.get("retrieval_time_ms", 0.0)
+        generation_time_ms = state.execution_metadata.get("generation_time_ms", 0.0)
+        verification_time_ms = state.execution_metadata.get("verification_time_ms", 0.0)
+
+        # Get model names
+        embedder = self._retrieval._embedding_service._embedder
+        embedding_model = getattr(embedder, "model_name", "placeholder-embedder")
+        if not isinstance(embedding_model, str):
+            embedding_model = "mock-embedder"
+            
+        llm_provider = self._llm._provider
+        llm_model = getattr(llm_provider, "_model_name", getattr(llm_provider, "provider_name", "mock"))
+        if not isinstance(llm_model, str):
+            llm_model = "mock-llm"
+
+        # Get detailed verification scores
+        semantic_similarity = 0.0
+        lexical_overlap = 0.0
+        consensus_score = 0.0
+        if state.verification_result:
+            metadata = state.verification_result.metadata or {}
+            lexical_overlap = metadata.get("lexical_score", 0.0)
+            semantic_similarity = metadata.get("semantic_score", 0.0)
+            consensus_score = metadata.get("chunk_consensus", 0.0)
+
+        # Get dynamic conversation title from LLM generation metadata
+        llm_meta = state.execution_metadata.get("llm_metadata") or {}
+        conversation_title = llm_meta.get("title") or "Untitled Chat"
 
         return QueryPipelineResult(
             query_id=query_id,
@@ -91,6 +132,17 @@ class QueryService:
             retrieval_stats=retrieval_stats,
             grounded=grounded,
             verification_reason=verification_reason,
+            conversation_title=conversation_title,
+            retrieval_time_ms=retrieval_time_ms,
+            generation_time_ms=generation_time_ms,
+            verification_time_ms=verification_time_ms,
+            embedding_model=embedding_model,
+            llm_model=llm_model,
+            semantic_similarity=semantic_similarity,
+            lexical_overlap=lexical_overlap,
+            consensus_score=consensus_score,
+            claims=claims,
+            conflicts=conflicts,
             error=error,
         )
 
@@ -138,6 +190,17 @@ def to_query_response(result: QueryPipelineResult) -> QueryResponse:
         retrieval_stats=RetrievalStats(**result.retrieval_stats) if result.retrieval_stats else None,
         grounded=result.grounded,
         verification_reason=result.verification_reason,
+        conversation_title=result.conversation_title,
+        retrieval_time_ms=result.retrieval_time_ms,
+        generation_time_ms=result.generation_time_ms,
+        verification_time_ms=result.verification_time_ms,
+        embedding_model=result.embedding_model,
+        llm_model=result.llm_model,
+        semantic_similarity=result.semantic_similarity,
+        lexical_overlap=result.lexical_overlap,
+        consensus_score=result.consensus_score,
+        claims=[ClaimVerification(**c) for c in result.claims] if result.claims else [],
+        conflicts=[ConflictDetail(**c) for c in result.conflicts] if result.conflicts else [],
     )
 
 

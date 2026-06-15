@@ -93,6 +93,19 @@ class TextChunker:
             "end_char": end_char,
             "char_count": end_char - start_char,
         }
+
+        # Determine page number if page_ranges metadata is available
+        page_number = 1
+        page_ranges = base_metadata.get("page_ranges")
+        if page_ranges:
+            midpoint = (start_char + end_char) // 2
+            for p_range in page_ranges:
+                if p_range["start_char"] <= midpoint <= p_range["end_char"]:
+                    page_number = p_range["page_number"]
+                    break
+
+        chunk_metadata["page_number"] = page_number
+
         return Chunk(
             chunk_id=f"{document_id}:chunk:{chunk_index}",
             document_id=document_id,

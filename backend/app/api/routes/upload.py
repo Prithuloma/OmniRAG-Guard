@@ -83,6 +83,7 @@ async def upload_file(file: UploadFile) -> UploadIngestionResponse:
         status=result.status,
         chunks_created=result.chunks_created,
         vectors_stored=result.vectors_stored,
+        pages_processed=result.ingestion.pages_processed if result.ingestion else 0,
     )
 
 

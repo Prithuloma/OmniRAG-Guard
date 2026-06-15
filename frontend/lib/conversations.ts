@@ -7,6 +7,27 @@ export interface Evidence {
   page_number?: number;
 }
 
+export interface ClaimCitation {
+  document_id: string;
+  page_number: number;
+  source_index: number;
+}
+
+export interface ClaimVerification {
+  text: string;
+  grounding_score: number;
+  status: "grounded" | "partially_grounded" | "ungrounded";
+  citations: ClaimCitation[];
+}
+
+export interface ConflictDetail {
+  source_a: string;
+  source_b: string;
+  page_a: number;
+  page_b: number;
+  description: string;
+}
+
 export interface Message {
   id: string;
   role: "user" | "assistant";
@@ -23,6 +44,18 @@ export interface Message {
   rerankTimeMs?: number;
   verificationReason?: string;
   streaming?: boolean;
+  retrievalTimeMs?: number;
+  generationTimeMs?: number;
+  verificationTimeMs?: number;
+  embeddingModel?: string;
+  llmModel?: string;
+  semanticSimilarity?: number;
+  lexicalOverlap?: number;
+  consensusScore?: number;
+  claims?: ClaimVerification[];
+  conflicts?: ConflictDetail[];
+  selfCorrectionTriggered?: boolean;
+  refinementTimeMs?: number;
 }
 
 export interface Conversation {

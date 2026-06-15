@@ -40,8 +40,17 @@ class PDFParser(BaseParser):
                     )
 
                 page_texts: list[str] = []
+                page_ranges = []
+                current_offset = 0
                 for page in document:
-                    page_texts.append(page.get_text())
+                    p_text = page.get_text()
+                    page_texts.append(p_text)
+                    page_ranges.append({
+                        "page_number": page.number + 1,
+                        "start_char": current_offset,
+                        "end_char": current_offset + len(p_text)
+                    })
+                    current_offset += len(p_text) + 1 # 1 for the '\n' separator
 
                 extracted_text = "\n".join(page_texts).strip()
                 if not extracted_text:
@@ -59,6 +68,7 @@ class PDFParser(BaseParser):
                     status=ParseStatus.SUCCESS,
                     extracted_text=extracted_text,
                     page_count=page_count,
+                    page_ranges=page_ranges,
                 )
         except Exception:
             return self._build_result(
@@ -77,17 +87,22 @@ class PDFParser(BaseParser):
         status: ParseStatus,
         extracted_text: str,
         page_count: int,
+        page_ranges: list[dict[str, int]] | None = None,
     ) -> ParseResult:
+        metadata = {
+            "content_type": content_type,
+            "page_count": page_count,
+            "file_name": filename,
+            "parser_type": ParserType.PDF.value,
+            "extraction_status": status.value,
+        }
+        if page_ranges:
+            metadata["page_ranges"] = page_ranges
+
         return ParseResult(
             parser_type=ParserType.PDF,
             file_name=filename,
             status=status,
             extracted_text=extracted_text,
-            metadata={
-                "content_type": content_type,
-                "page_count": page_count,
-                "file_name": filename,
-                "parser_type": ParserType.PDF.value,
-                "extraction_status": status.value,
-            },
+            metadata=metadata,
         )

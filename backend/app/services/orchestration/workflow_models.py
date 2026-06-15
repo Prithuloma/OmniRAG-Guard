@@ -46,4 +46,15 @@ class QueryPipelineResult:
     retrieval_stats: dict[str, Any] | None = None
     grounded: bool = False
     verification_reason: str = ""
+    conversation_title: str = ""
+    retrieval_time_ms: float = 0.0
+    generation_time_ms: float = 0.0
+    verification_time_ms: float = 0.0
+    embedding_model: str = ""
+    llm_model: str = ""
+    semantic_similarity: float = 0.0
+    lexical_overlap: float = 0.0
+    consensus_score: float = field(default=0.0)
+    claims: list[dict[str, Any]] = field(default_factory=list)
+    conflicts: list[dict[str, Any]] = field(default_factory=list)
     error: QueryPipelineError | None = None
