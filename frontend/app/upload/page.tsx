@@ -98,8 +98,9 @@ export default function UploadPage() {
           )
         );
 
-        if (user && responseData.document_id) {
-          addHistory(user.uid, {
+        const userId = user?.uid || "guest";
+        if (responseData.document_id) {
+          addHistory(userId, {
             documentId: responseData.document_id,
             filename: f.name,
             size: (f.file.size / 1024).toFixed(1) + " KB",
@@ -107,7 +108,8 @@ export default function UploadPage() {
             pages: responseData.pages_processed,
           });
         }
-      } catch {
+      } catch (err: any) {
+        console.error("Upload error details:", err);
         setFiles((prev) => prev.map((x) => (x.id === f.id ? { ...x, status: "error", progress: 0 } : x)));
       }
     }

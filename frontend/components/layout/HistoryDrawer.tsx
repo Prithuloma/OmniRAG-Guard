@@ -13,8 +13,9 @@ export default function HistoryDrawer() {
   const [errorMsg, setErrorMsg] = useState("");
 
   const loadHistory = () => {
-    if (user && isHistoryOpen) {
-      setHistory(getHistory(user.uid));
+    if (isHistoryOpen) {
+      const userId = user?.uid || "guest";
+      setHistory(getHistory(userId));
     }
   };
 
@@ -25,13 +26,13 @@ export default function HistoryDrawer() {
   if (!isHistoryOpen) return null;
 
   const handleTogglePin = (docId: string) => {
-    if (!user) return;
-    const updated = togglePinHistory(user.uid, docId);
+    const userId = user?.uid || "guest";
+    const updated = togglePinHistory(userId, docId);
     setHistory(updated);
   };
 
   const handleDelete = async (docId: string) => {
-    if (!user) return;
+    const userId = user?.uid || "guest";
     if (!confirm("Are you sure you want to delete this file? This will remove its embeddings from the database and delete it from your storage context.")) {
       return;
     }
@@ -44,7 +45,7 @@ export default function HistoryDrawer() {
       await deleteFile(docId);
       
       // 2. Delete from local history list
-      const updated = deleteFromHistory(user.uid, docId);
+      const updated = deleteFromHistory(userId, docId);
       setHistory(updated);
     } catch (err: any) {
       setErrorMsg(err.message || "Failed to purge file from backend service.");

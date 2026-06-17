@@ -162,14 +162,14 @@ export default function DashboardPage() {
   });
 
   const loadDashboardData = () => {
-    if (!user) return;
+    const userId = user?.uid || "guest";
     
     // 1. Load upload history
-    const fileHistory = getHistory(user.uid);
+    const fileHistory = getHistory(userId);
     setHistory(fileHistory);
 
     // 2. Load conversations and compute statistics
-    const conversations = getConversations(user.uid);
+    const conversations = getConversations(userId);
     let queryCount = 0;
     let hallucinationCount = 0;
     let totalLatency = 0;
@@ -228,19 +228,19 @@ export default function DashboardPage() {
   }, [user]);
 
   const handleTogglePin = (docId: string) => {
-    if (!user) return;
-    const updated = togglePinHistory(user.uid, docId);
+    const userId = user?.uid || "guest";
+    const updated = togglePinHistory(userId, docId);
     setHistory(updated);
   };
 
   const handleDelete = async (docId: string) => {
-    if (!user) return;
+    const userId = user?.uid || "guest";
     if (!confirm("Are you sure you want to delete this document? This will remove its embeddings from the vector database and delete the local file.")) return;
 
     setDeletingId(docId);
     try {
       await deleteFile(docId);
-      const updated = deleteFromHistory(user.uid, docId);
+      const updated = deleteFromHistory(userId, docId);
       setHistory(updated);
       loadDashboardData();
     } catch (err: any) {
@@ -256,9 +256,9 @@ export default function DashboardPage() {
   };
 
   const handleSaveRename = (docId: string) => {
-    if (!user) return;
+    const userId = user?.uid || "guest";
     if (editingName.trim()) {
-      const updated = renameHistoryItem(user.uid, docId, editingName.trim());
+      const updated = renameHistoryItem(userId, docId, editingName.trim());
       setHistory(updated);
     }
     setEditingId(null);

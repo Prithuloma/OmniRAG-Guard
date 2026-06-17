@@ -244,17 +244,16 @@ function ChatContent() {
 
   // Initialize selected document IDs
   useEffect(() => {
-    if (user) {
-      const history = getHistory(user.uid).filter((h) => h.status === "done");
-      setSelectedDocIds(history.map((h) => h.documentId));
-    }
+    const userId = user?.uid || "guest";
+    const history = getHistory(userId).filter((h) => h.status === "done");
+    setSelectedDocIds(history.map((h) => h.documentId));
   }, [user]);
 
   // Load conversation on ID change
   useEffect(() => {
-    if (!user) return;
+    const userId = user?.uid || "guest";
     if (activeChatId) {
-      const conversations = getConversations(user.uid);
+      const conversations = getConversations(userId);
       const match = conversations.find((c) => c.id === activeChatId);
       if (match) {
         setMessages(match.messages);
@@ -280,8 +279,8 @@ function ChatContent() {
 
   // Resolve filename helper
   const getDocFilename = (docId: string) => {
-    if (!user) return docId;
-    const history = getHistory(user.uid);
+    const userId = user?.uid || "guest";
+    const history = getHistory(userId);
     const matched = history.find((h) => h.documentId === docId);
     return matched ? matched.filename : docId;
   };
@@ -321,7 +320,7 @@ function ChatContent() {
 
   const exportConversationMarkdown = () => {
     if (messages.length === 0) return;
-    const activeConv = getConversations(user?.uid || "").find((c) => c.id === activeChatId);
+    const activeConv = getConversations(user?.uid || "guest").find((c) => c.id === activeChatId);
     const title = activeConv ? activeConv.title : "OmniRAG Conversation";
     
     let text = `# RAG Conversation: ${title}\n\n`;
@@ -387,7 +386,7 @@ function ChatContent() {
 
   const printConversation = () => {
     if (messages.length === 0) return;
-    const activeConv = getConversations(user?.uid || "").find((c) => c.id === activeChatId);
+    const activeConv = getConversations(user?.uid || "guest").find((c) => c.id === activeChatId);
     const title = activeConv ? activeConv.title : "OmniRAG Conversation";
     
     const printWindow = window.open("", "_blank");
@@ -427,10 +426,10 @@ function ChatContent() {
   };
 
   const handleSend = async (content: string) => {
-    if (!user) return;
     setIsLoading(true);
     setLoadingStep(0);
 
+    const userId = user?.uid || "guest";
     const chatId = activeChatId || Date.now().toString();
     const chatTitle = activeChatId
       ? undefined
@@ -548,11 +547,11 @@ function ChatContent() {
             // Save conversation state
             const currentConv: Conversation = {
               id: chatId,
-              title: activeChatId ? (getConversations(user.uid).find((c) => c.id === activeChatId)?.title || "Untitled Chat") : generatedTitle,
+              title: activeChatId ? (getConversations(userId).find((c) => c.id === activeChatId)?.title || "Untitled Chat") : generatedTitle,
               messages: finalMessages,
               updatedAt: new Date().toISOString(),
             };
-            saveConversation(user.uid, currentConv);
+            saveConversation(userId, currentConv);
 
             return finalMessages;
           });

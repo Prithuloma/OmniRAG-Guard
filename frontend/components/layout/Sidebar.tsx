@@ -44,11 +44,8 @@ export default function Sidebar() {
   const [editingTitle, setEditingTitle] = useState("");
 
   const loadConversations = () => {
-    if (user) {
-      setConversations(getConversations(user.uid));
-    } else {
-      setConversations([]);
-    }
+    const userId = user?.uid || "guest";
+    setConversations(getConversations(userId));
   };
 
   useEffect(() => {
@@ -56,9 +53,9 @@ export default function Sidebar() {
   }, [user, pathname, searchParams]);
 
   const handleRename = (id: string) => {
-    if (!user) return;
+    const userId = user?.uid || "guest";
     if (editingTitle.trim()) {
-      const updated = renameConversation(user.uid, id, editingTitle.trim());
+      const updated = renameConversation(userId, id, editingTitle.trim());
       setConversations(updated);
     }
     setEditingId(null);
@@ -67,9 +64,9 @@ export default function Sidebar() {
   const handleDelete = (id: string, e: React.MouseEvent) => {
     e.stopPropagation();
     e.preventDefault();
-    if (!user) return;
+    const userId = user?.uid || "guest";
     if (confirm("Are you sure you want to delete this conversation?")) {
-      const updated = deleteConversation(user.uid, id);
+      const updated = deleteConversation(userId, id);
       setConversations(updated);
       if (activeChatId === id) {
         router.push("/chat");
