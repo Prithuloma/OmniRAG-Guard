@@ -75,7 +75,7 @@ function FormattedMarkdown({
     if (!text) return "";
     
     const parts: React.ReactNode[] = [];
-    const regex = /(\*\*.*?\*\*|\[\d+\])/g;
+    const regex = /(\*\*.*?\*\*|\[\d+\]|!\[.*?\]\(.*?\))/g;
     const splitParts = text.split(regex);
     
     splitParts.forEach((part, i) => {
@@ -93,6 +93,29 @@ function FormattedMarkdown({
             {num}
           </button>
         );
+      } else if (part.startsWith("![") && part.includes("](")) {
+        const match = part.match(/^!\[(.*?)\]\((.*?)\)$/);
+        if (match) {
+          const alt = match[1];
+          const src = match[2];
+          parts.push(
+            <div key={i} className="my-4 rounded-xl overflow-hidden border border-border/60 bg-slate-900/50 p-2 max-w-lg shadow-md hover:border-primary/30 transition-all">
+              <img
+                src={src}
+                alt={alt}
+                className="w-full h-auto rounded-lg object-contain max-h-[350px]"
+                loading="lazy"
+              />
+              {alt && (
+                <p className="text-[10px] text-center text-muted-foreground/80 mt-1.5 font-medium italic">
+                  {alt}
+                </p>
+              )}
+            </div>
+          );
+        } else {
+          parts.push(part);
+        }
       } else {
         parts.push(part);
       }

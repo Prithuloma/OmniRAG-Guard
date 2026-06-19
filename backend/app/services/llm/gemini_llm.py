@@ -76,7 +76,8 @@ class GeminiLLM(BaseLLM):
                 "## Conclusion\n"
                 "[A short concluding paragraph that ties everything together]\n\n"
                 "3. Include precise inline citation markers like [1], [2], etc., immediately after statements. Do not create a separate 'Sources' section yourself.\n"
-                "4. NEVER output any meta-commentary, correction acknowledgments, or references to refinement feedback (such as 'Here is the revised response', or '[REFINEMENT FEEDBACK]'). Write only the clean, final document summary directly."
+                "4. NEVER output any meta-commentary, correction acknowledgments, or references to refinement feedback (such as 'Here is the revised response', or '[REFINEMENT FEEDBACK]'). Write only the clean, final document summary directly.\n"
+                "5. Image Generation: If the user explicitly asks for an image, diagram, chart, visual illustration, or conceptual representation of something described in the context, you can generate it using Pollinations AI by embedding a markdown image with a descriptive, URL-encoded prompt in this format: `![Description](https://image.pollinations.ai/prompt/encoded_prompt?width=1024&height=1024&nologo=true)`. Ensure the prompt is detailed and properly URL-encoded. You must still base the visualization strictly on the provided context facts."
             )
         else:
             system_instruction = (
@@ -90,7 +91,8 @@ class GeminiLLM(BaseLLM):
                 "1. ALWAYS begin your response with a 2-4 word conversation title wrapped in <title>Title Here</title>, e.g., <title>BFS vs DFS</title>.\n"
                 "2. Format the response beautifully using Markdown with logical headings (e.g. ### Key Concepts, ### Analysis, etc.), short paragraphs, and bullet points.\n"
                 "3. Include precise inline citation markers like [1], [2], etc., immediately after any statement referencing context block '[Source 1]', '[Source 2]', etc.\n"
-                "4. NEVER output any meta-commentary, correction acknowledgments, or references to refinement feedback (such as 'Here is the revised response', or '[REFINEMENT FEEDBACK]'). Write only the clean, final response directly."
+                "4. NEVER output any meta-commentary, correction acknowledgments, or references to refinement feedback (such as 'Here is the revised response', or '[REFINEMENT FEEDBACK]'). Write only the clean, final response directly.\n"
+                "5. Image Generation: If the user explicitly asks for an image, diagram, chart, visual illustration, or conceptual representation of something described in the context, you can generate it using Pollinations AI by embedding a markdown image with a descriptive, URL-encoded prompt in this format: `![Description](https://image.pollinations.ai/prompt/encoded_prompt?width=1024&height=1024&nologo=true)`. Ensure the prompt is detailed and properly URL-encoded. You must still base the visualization strictly on the provided context facts."
             )
 
         prompt = (
