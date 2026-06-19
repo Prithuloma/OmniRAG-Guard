@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
-import { Send } from "lucide-react";
+import { Send, Mic } from "lucide-react";
 
 interface Props {
   onSend: (message: string) => void;
@@ -11,6 +11,58 @@ interface Props {
 export default function ChatInput({ onSend, disabled }: Props) {
   const [value, setValue] = useState("");
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  
+  // Voice feature states
+  const [isListening, setIsListening] = useState(false);
+  const [isSpeechSupported, setIsSpeechSupported] = useState(false);
+  const recognitionRef = useRef<any>(null);
+
+  // Initialize SpeechRecognition client-side
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const SpeechRecognition =
+        (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+      if (SpeechRecognition) {
+        setIsSpeechSupported(true);
+        const rec = new SpeechRecognition();
+        rec.continuous = false;
+        rec.interimResults = false;
+        rec.lang = "en-US";
+
+        rec.onresult = (event: any) => {
+          const transcript = event.results[0][0].transcript;
+          setValue((prev) => (prev ? prev + " " + transcript : transcript));
+        };
+
+        rec.onerror = (event: any) => {
+          console.error("Speech recognition error:", event.error);
+          setIsListening(false);
+        };
+
+        rec.onend = () => {
+          setIsListening(false);
+        };
+
+        recognitionRef.current = rec;
+      }
+    }
+  }, []);
+
+  const toggleListening = () => {
+    if (!recognitionRef.current || disabled) return;
+
+    if (isListening) {
+      recognitionRef.current.stop();
+      setIsListening(false);
+    } else {
+      try {
+        recognitionRef.current.start();
+        setIsListening(true);
+      } catch (err) {
+        console.error("Failed to start speech recognition:", err);
+      }
+    }
+  };
 
   // Auto-grow textarea effect
   useEffect(() => {
@@ -23,6 +75,10 @@ export default function ChatInput({ onSend, disabled }: Props) {
 
   const handleSend = () => {
     if (!value.trim() || disabled) return;
+    if (isListening) {
+      recognitionRef.current?.stop();
+      setIsListening(false);
+    }
     onSend(value.trim());
     setValue("");
   };
@@ -46,6 +102,22 @@ export default function ChatInput({ onSend, disabled }: Props) {
           disabled={disabled}
         />
       </div>
+      
+      {isSpeechSupported && (
+        <button
+          onClick={toggleListening}
+          disabled={disabled}
+          className={`rounded-xl p-3.5 border transition-all cursor-pointer flex-shrink-0 disabled:opacity-40 disabled:cursor-not-allowed
+            ${isListening 
+              ? "bg-red-500/10 border-red-500/30 text-red-400 animate-pulse scale-105 shadow-inner shadow-red-500/5" 
+              : "bg-slate-900 border-border/80 text-slate-400 hover:text-white hover:border-border hover:bg-slate-900/80"
+            }`}
+          title={isListening ? "Stop voice listening" : "Record voice query"}
+        >
+          <Mic className="w-3.5 h-3.5" />
+        </button>
+      )}
+
       <button
         onClick={handleSend}
         disabled={disabled || !value.trim()}
