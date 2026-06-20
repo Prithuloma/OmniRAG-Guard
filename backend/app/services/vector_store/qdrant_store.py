@@ -46,14 +46,15 @@ class QdrantStore:
     def __init__(
         self,
         *,
-        url: str = "http://localhost:6333",
-        collection_name: str = COLLECTION_NAME,
+        url: str | None = None,
+        collection_name: str | None = None,
         vector_dimension: int | None = None,
         client: QdrantClient | None = None,
     ) -> None:
-        self._url = url
-        self._collection_name = collection_name
-        self._vector_dimension = vector_dimension or DEFAULT_EMBEDDING_DIMENSION
+        from app.core.config import settings
+        self._url = url or settings.QDRANT_URL
+        self._collection_name = collection_name or settings.QDRANT_COLLECTION_NAME
+        self._vector_dimension = vector_dimension or settings.EMBEDDING_DIMENSION
         self._client = client
 
     @property

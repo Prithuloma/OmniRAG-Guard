@@ -16,7 +16,11 @@ export async function queryRAG(query: string, topK = 3, filters?: any) {
   });
   if (!res.ok) {
     const errorData = await res.json().catch(() => ({}));
-    const message = errorData.detail?.message || errorData.detail || "Query failed";
+    const detail = errorData.detail;
+    const message = 
+      typeof detail === "string" 
+        ? detail 
+        : detail?.message || detail?.code || detail?.context?.detail || JSON.stringify(detail) || "Query failed";
     throw new Error(message);
   }
   return res.json();
