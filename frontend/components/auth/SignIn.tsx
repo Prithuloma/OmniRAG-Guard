@@ -62,7 +62,7 @@ export default function SignIn() {
   };
 
   return (
-    <div className="relative min-h-screen flex items-center justify-center bg-slate-950 overflow-hidden font-sans">
+    <div className="relative min-h-screen flex items-center justify-center bg-transparent overflow-hidden font-sans">
       {/* Background decoration */}
       <div className="absolute top-[-30%] left-[-20%] w-[800px] h-[800px] rounded-full bg-violet-950/20 blur-[160px] pointer-events-none" />
       <div className="absolute bottom-[-30%] right-[-20%] w-[800px] h-[800px] rounded-full bg-indigo-950/20 blur-[160px] pointer-events-none" />
