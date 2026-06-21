@@ -308,7 +308,9 @@ export default function DashboardPage() {
       {/* Analytics Cards Grid (8 Cards Layout) */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {cards.map(({ label, value, icon: Icon, desc, color }) => (
-          <div key={label} className="rounded-2xl border border-slate-850 bg-slate-900/20 p-5 shadow-sm hover:border-slate-800 transition-all duration-300">
+          <div key={label} className="rounded-2xl border border-violet-500/20 bg-slate-900/40 p-5 shadow-[0_0_20px_rgba(139,92,246,0.08)] relative overflow-hidden transition-all duration-300 hover:border-violet-500/35">
+            {/* Top border glow line */}
+            <div className="absolute top-0 left-0 right-0 h-[1px] bg-gradient-to-r from-transparent via-violet-500/60 to-transparent" />
             <div className="flex items-center justify-between mb-4">
               <p className="text-slate-400 text-[9px] uppercase font-bold tracking-wider">{label}</p>
               <div className={`p-1.5 bg-slate-950 border border-slate-800 rounded-lg ${color}`}>

@@ -90,7 +90,7 @@ export default function Sidebar() {
   const groups = groupConversations(filteredConversations);
 
   return (
-    <aside className="w-60 min-h-screen border-r border-border bg-slate-950 flex flex-col justify-between font-sans transition-all duration-300">
+    <aside className="w-60 min-h-screen border-r border-violet-500/20 bg-slate-950/85 backdrop-blur-md flex flex-col justify-between font-sans transition-all duration-300 relative z-10 overflow-hidden">
       <div className="flex flex-col flex-1 min-h-0">
         <div className="px-6 py-5 flex items-center gap-2.5 border-b border-border flex-shrink-0">
           <div className="p-1.5 rounded-lg bg-primary/10 text-primary border border-primary/20">
@@ -286,6 +286,14 @@ export default function Sidebar() {
           </button>
         </div>
       )}
+
+      {/* Bottom glowing background overlay */}
+      <div 
+        className="absolute bottom-0 left-0 right-0 h-48 pointer-events-none z-[-1]"
+        style={{
+          background: "radial-gradient(ellipse at 50% 100%, rgba(139, 92, 246, 0.15) 0%, transparent 70%)"
+        }}
+      />
     </aside>
   );
 }
