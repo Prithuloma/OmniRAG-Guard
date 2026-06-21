@@ -1,7 +1,9 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import Sidebar from "@/components/layout/Sidebar";
+import ParticleBackground from "@/components/layout/ParticleBackground";
 import "./globals.css";
+import CustomCursor from "@/components/layout/CustomCursor";
 
 const geist = Geist({ subsets: ["latin"], variable: "--font-geist-sans" });
 const geistMono = Geist_Mono({ subsets: ["latin"], variable: "--font-geist-mono" });
@@ -15,7 +17,10 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="en" className="dark">
       <body className={`${geist.variable} ${geistMono.variable} font-sans bg-background text-foreground antialiased`}>
-        <div className="flex min-h-screen">
+        <ParticleBackground />
+        <CustomCursor />
+
+        <div style={{ position: "relative", zIndex: 1, display: "flex", minHeight: "100vh" }}>
           <Sidebar />
           <main className="flex-1 overflow-auto">
             {children}
