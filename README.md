@@ -360,8 +360,37 @@ Configuration variables are stored in the `.env` file at the root of the project
 
 ---
 
-## Run with Docker
+## Run Locally (Without Docker)
 
+To run the application locally on your machine, start the backend and frontend in separate terminal windows:
+
+### 1. Run Backend (FastAPI)
+From the project root:
+```bash
+cd backend
+# Activate the python virtual environment
+.\.venv\Scripts\Activate.ps1
+# (Optional) Install Python packages
+pip install -r requirements.txt
+# Run the FastAPI server
+uvicorn app.main:app --reload --host 127.0.0.1 --port 8000
+```
+*(If Qdrant is offline, the backend will automatically fall back to using the local embedded database at `storage/qdrant_db`).*
+
+### 2. Run Frontend (Next.js)
+From the project root in a new terminal window:
+```bash
+cd frontend
+# Install dependencies
+npm install
+# Start dev server
+npm run dev
+```
+The frontend is available at [http://localhost:3000](http://localhost:3000).
+
+---
+
+## Run with Docker
 
 ```bash
 docker compose up
@@ -379,16 +408,23 @@ http://localhost:8000/docs
 
 # Running Tests
 
-Run all tests:
+Run all tests from the `backend` directory (using the virtual environment):
 
 ```bash
-pytest
+cd backend
+..\.venv\Scripts\pytest
+```
+
+Alternatively, from the project root using `PYTHONPATH`:
+
+```powershell
+$env:PYTHONPATH="backend"; .\.venv\Scripts\pytest
 ```
 
 ### Current Test Status
 
 ```text
-101 Passing Tests (100% passing offline)
+110 Passing Tests (100% passing offline)
 ```
 
 ---
@@ -405,7 +441,7 @@ pytest
 - **Diagnostic Verification Panel**: Grounding indicators (Grounded/Partially Grounded/Low Evidence) with interactive citation highlights and keyword match markings.
 - **Secure Authentication**: Credentials sign-in (email/password) and Google Sign-in with session persistent conversation history drawer.
 - **Control Dashboard & History drawer**: Indicators for document size, chunk metrics, average latencies, knowledge base grids, pin/unpin options, and database purge actions.
-- **SQLite Embedded Vector Database**: Integrated automatic local Sqlite-based vector database fallback when the Qdrant server is offline.
+- **Local Embedded Vector Database**: Integrated automatic local directory-based Qdrant client fallback (`storage/qdrant_db`) when the remote Qdrant server is offline.
 - **Multi-format Ingestion & OCR**: PDF, DOCX, TXT, and PNG/JPG OCR-based image text extraction.
 - **Comprehensive Offline Mock Testing**: Fully simulated Gemini model responses, connection validation, and fallback mechanisms in python test cases.
 
