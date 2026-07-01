@@ -1,8 +1,29 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
-import { LayoutDashboard, MessageSquare, Upload, Shield } from "lucide-react";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { useState, useEffect } from "react";
+import {
+  LayoutDashboard,
+  MessageSquare,
+  Upload,
+  Shield,
+  LogOut,
+  History,
+  Plus,
+  Pencil,
+  Trash2,
+  Check,
+  X
+} from "lucide-react";
+import { useAuth } from "@/context/AuthContext";
+import {
+  getConversations,
+  renameConversation,
+  deleteConversation,
+  groupConversations,
+  Conversation
+} from "@/lib/conversations";
 
 const navItems = [
   { label: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
@@ -12,6 +33,61 @@ const navItems = [
 
 export default function Sidebar() {
   const pathname = usePathname();
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const activeChatId = searchParams.get("id");
+  const { user, logout, setHistoryOpen } = useAuth();
+
+  const [conversations, setConversations] = useState<Conversation[]>([]);
+  const [chatSearchTerm, setChatSearchTerm] = useState("");
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editingTitle, setEditingTitle] = useState("");
+
+  const loadConversations = () => {
+    const userId = user?.uid || "guest";
+    setConversations(getConversations(userId));
+  };
+
+  useEffect(() => {
+    loadConversations();
+  }, [user, pathname, searchParams]);
+
+  const handleRename = (id: string) => {
+    const userId = user?.uid || "guest";
+    if (editingTitle.trim()) {
+      const updated = renameConversation(userId, id, editingTitle.trim());
+      setConversations(updated);
+    }
+    setEditingId(null);
+  };
+
+  const handleDelete = (id: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    e.preventDefault();
+    const userId = user?.uid || "guest";
+    if (confirm("Are you sure you want to delete this conversation?")) {
+      const updated = deleteConversation(userId, id);
+      setConversations(updated);
+      if (activeChatId === id) {
+        router.push("/chat");
+      }
+    }
+  };
+
+  const startRename = (id: string, title: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    e.preventDefault();
+    setEditingId(id);
+    setEditingTitle(title);
+  };
+
+  // Filter conversations by search term
+  const filteredConversations = conversations.filter(c =>
+    c.title.toLowerCase().includes(chatSearchTerm.toLowerCase()) ||
+    c.messages.some(m => m.content.toLowerCase().includes(chatSearchTerm.toLowerCase()))
+  );
+
+  const groups = groupConversations(filteredConversations);
 
   return (
     <aside style={{
