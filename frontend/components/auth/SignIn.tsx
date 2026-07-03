@@ -55,7 +55,9 @@ export default function SignIn() {
     try {
       await loginWithGoogle();
     } catch (err: any) {
-      setError(err.message || "Failed to sign in with Google.");
+      if (err.code !== "auth/popup-closed-by-user" && err.code !== "auth/cancelled-popup-request") {
+        setError(err.message || "Failed to sign in with Google.");
+      }
     } finally {
       setLoggingIn(false);
     }
@@ -184,7 +186,7 @@ export default function SignIn() {
               />
             </svg>
           )}
-          <span>Google Workspace Account</span>
+          <span>Sign in with Google</span>
         </button>
 
         {/* Toggle Account Mode */}
