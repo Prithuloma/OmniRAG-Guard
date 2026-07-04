@@ -11,6 +11,7 @@ from app.services.vector_store.qdrant_store import (
     QdrantStore,
     QdrantStoreError,
     QdrantUnavailableError,
+    CollectionMissingError,
     VectorSearchResult,
 )
 
@@ -142,6 +143,19 @@ class RetrievalService:
                     )
                     search_time_ms = (time.perf_counter() - start_search) * 1000.0
                     
+        except CollectionMissingError as exc:
+            logger.info(f"Collection does not exist yet. Returning no results: {exc}")
+            return RetrievalResult(
+                query=normalized_query,
+                chunks=[],
+                status="no_results",
+                error=RetrievalError(
+                    code=RetrievalErrorCode.NO_RESULTS,
+                    message="No matching chunks found (collection does not exist yet).",
+                ),
+                search_time_ms=search_time_ms,
+                rerank_time_ms=rerank_time_ms,
+            )
         except QdrantUnavailableError as exc:
             logger.error(f"Qdrant unavailable during search: {exc}")
             return RetrievalResult(

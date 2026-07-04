@@ -2,7 +2,7 @@
 
 import { createContext, useContext, useEffect, useState } from "react";
 import { User, signInWithPopup, signOut, onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword } from "firebase/auth";
-import { auth, googleProvider } from "@/lib/firebase";
+import { auth, googleProvider, hasFirebaseConfig } from "@/lib/firebase";
 
 interface AuthContextType {
   user: User | null;
@@ -32,6 +32,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [isHistoryOpen, setHistoryOpen] = useState(false);
 
   useEffect(() => {
+    if (!hasFirebaseConfig) {
+      const savedUser = localStorage.getItem("omnirag_mock_user");
+      if (savedUser) {
+        setUser(JSON.parse(savedUser));
+      } else {
+        setUser(null);
+      }
+      setLoading(false);
+      return () => {};
+    }
+
     const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
       setUser(currentUser);
       setLoading(false);
@@ -40,6 +51,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const loginWithGoogle = async () => {
+    if (!hasFirebaseConfig) {
+      const mockUser = {
+        uid: "google-guest-id",
+        email: "google-guest@omnirag.local",
+        displayName: "Google Guest",
+        emailVerified: true,
+      } as any;
+      localStorage.setItem("omnirag_mock_user", JSON.stringify(mockUser));
+      setUser(mockUser);
+      return;
+    }
     try {
       await signInWithPopup(auth, googleProvider);
     } catch (error) {
@@ -49,6 +71,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const loginWithEmail = async (email: string, password: string) => {
+    if (!hasFirebaseConfig) {
+      const mockUser = {
+        uid: "email-guest-id",
+        email: email || "developer@omnirag.local",
+        displayName: email ? email.split("@")[0] : "Local Developer",
+        emailVerified: true,
+      } as any;
+      localStorage.setItem("omnirag_mock_user", JSON.stringify(mockUser));
+      setUser(mockUser);
+      return;
+    }
     try {
       await signInWithEmailAndPassword(auth, email, password);
     } catch (error) {
@@ -58,6 +91,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const signUpWithEmail = async (email: string, password: string) => {
+    if (!hasFirebaseConfig) {
+      const mockUser = {
+        uid: "email-guest-id",
+        email: email,
+        displayName: email.split("@")[0],
+        emailVerified: true,
+      } as any;
+      localStorage.setItem("omnirag_mock_user", JSON.stringify(mockUser));
+      setUser(mockUser);
+      return;
+    }
     try {
       await createUserWithEmailAndPassword(auth, email, password);
     } catch (error) {
@@ -67,6 +111,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const logout = async () => {
+    if (!hasFirebaseConfig) {
+      localStorage.removeItem("omnirag_mock_user");
+      setUser(null);
+      return;
+    }
     try {
       await signOut(auth);
     } catch (error) {
