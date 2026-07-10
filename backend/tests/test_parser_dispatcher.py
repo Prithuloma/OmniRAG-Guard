@@ -11,8 +11,12 @@ import pytest
 from app.services.ingestion.parser_dispatcher import (
     ParserDispatchStatus,
     ParserDispatcher,
-    ParserType,
 )
+from app.services.ingestion.parsers.base_parser import BaseParser, ParserType
+from app.services.ingestion.parsers.docx_parser import DocxParser
+from app.services.ingestion.parsers.image_parser import ImageParser
+from app.services.ingestion.parsers.pdf_parser import PDFParser
+from app.services.ingestion.parsers.text_parser import TextParser
 
 
 @pytest.fixture
@@ -21,17 +25,48 @@ def dispatcher() -> ParserDispatcher:
 
 
 @pytest.mark.parametrize(
-    ("filename", "content_type", "expected_parser_type", "expected_extension"),
+    (
+        "filename",
+        "content_type",
+        "expected_parser_type",
+        "expected_extension",
+        "expected_parser_cls",
+    ),
     [
-        ("annual_report.pdf", "application/pdf", ParserType.PDF, ".pdf"),
-        ("image.png", "image/png", ParserType.IMAGE, ".png"),
-        ("photo.jpg", "image/jpeg", ParserType.IMAGE, ".jpg"),
-        ("notes.txt", "text/plain", ParserType.TEXT, ".txt"),
+        (
+            "annual_report.pdf",
+            "application/pdf",
+            ParserType.PDF,
+            ".pdf",
+            PDFParser,
+        ),
+        (
+            "image.png",
+            "image/png",
+            ParserType.IMAGE,
+            ".png",
+            ImageParser,
+        ),
+        (
+            "photo.jpg",
+            "image/jpeg",
+            ParserType.IMAGE,
+            ".jpg",
+            ImageParser,
+        ),
+        (
+            "notes.txt",
+            "text/plain",
+            ParserType.TEXT,
+            ".txt",
+            TextParser,
+        ),
         (
             "report.docx",
             "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-            ParserType.TEXT,
+            ParserType.DOCX,
             ".docx",
+            DocxParser,
         ),
     ],
 )
@@ -42,6 +77,7 @@ async def test_dispatch_selects_parser_by_extension(
     content_type: str,
     expected_parser_type: ParserType,
     expected_extension: str,
+    expected_parser_cls: type[BaseParser],
 ) -> None:
     result = await dispatcher.dispatch(
         filename=filename,
@@ -54,3 +90,4 @@ async def test_dispatch_selects_parser_by_extension(
     assert result.file_name == filename
     assert result.file_extension == expected_extension
     assert result.metadata["content_type"] == content_type
+    assert isinstance(result.parser, expected_parser_cls)

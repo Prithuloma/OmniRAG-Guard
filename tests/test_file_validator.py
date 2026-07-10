@@ -11,7 +11,7 @@ import pytest
 from unittest.mock import AsyncMock, MagicMock
 
 from app.core.constants import MAX_UPLOAD_SIZE_BYTES
-from app.schemas.validation import ValidationErrorCode
+from app.services.ingestion.validation import ValidationErrorCode
 from app.services.ingestion.file_validator import validate_upload_file
 
 

@@ -17,4 +17,5 @@ class QueryStatus(str, Enum):
     """Resolution state of a RAG query."""
     SUCCESS = "success"
     PARTIAL = "partial"   # answer found but low-confidence chunks
+    NO_RESULTS = "no_results"
     FAILED  = "failed"

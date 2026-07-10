@@ -76,6 +76,34 @@ class UploadResponse(BaseResponse):
     )
 
 
+class UploadIngestionResponse(BaseModel):
+    """Returned by POST /upload after validation, storage, and ingestion."""
+    document_id: str = Field(
+        description="Stable identifier assigned to the ingested document.",
+        examples=["doc_a1b2c3d4e5f6"],
+    )
+    status: str = Field(
+        description="Ingestion pipeline outcome.",
+        examples=["success"],
+    )
+    chunks_created: int = Field(
+        ge=0,
+        description="Number of text chunks generated from the document.",
+        examples=[12],
+    )
+    vectors_stored: int = Field(
+        ge=0,
+        description="Number of vectors upserted into the vector store.",
+        examples=[12],
+    )
+    pages_processed: int = Field(
+        default=0,
+        ge=0,
+        description="Number of pages processed from the document.",
+        examples=[5],
+    )
+
+
 # ── Query ─────────────────────────────────────────────────────────────────────
 
 class RetrievedChunk(BaseModel):
@@ -91,22 +119,58 @@ class RetrievedChunk(BaseModel):
         description="Parent document this chunk belongs to.",
         examples=["doc_a1b2c3d4e5f6"],
     )
-    content: str = Field(
+    page_number: int = Field(
+        default=0,
+        ge=0,
+        description="Source page in the original document, if available.",
+        examples=[4],
+    )
+    text: str = Field(
         description="Raw chunk text passed to the LLM as context.",
         examples=["Revenue increased by 18% YoY driven by SaaS subscriptions."],
     )
     score: float = Field(
-        ge=0.0,
-        le=1.0,
-        description="Similarity score between chunk and query (0 – 1).",
+        description="Similarity score returned by the vector store for this chunk.",
         examples=[0.87],
     )
-    page_number: Optional[int] = Field(
-        default=None,
-        ge=1,
-        description="Source page in the original document, if available.",
-        examples=[4],
-    )
+
+
+class Citation(BaseModel):
+    """Source attribution for LLM generated answers."""
+    document_id: str = Field(description="Parent document identifier.")
+    chunk_id: str = Field(description="Source chunk identifier.")
+    page_number: int = Field(default=0, description="Source page number if available.")
+
+
+class ClaimCitation(BaseModel):
+    """Citation metadata for a specific claim sentence."""
+    document_id: str = Field(description="Parent document identifier.")
+    page_number: int = Field(default=0, description="Source page number.")
+    source_index: int = Field(description="1-based index in the parent citations list.")
+
+
+class ClaimVerification(BaseModel):
+    """Grounding quality details for a single claim sentence."""
+    text: str = Field(description="The exact text of the claim sentence.")
+    grounding_score: float = Field(description="Sentence grounding score between 0.0 and 1.0.")
+    status: str = Field(description="Verification status: grounded, partially_grounded, or ungrounded.")
+    citations: list[ClaimCitation] = Field(default_factory=list, description="Citations supporting this claim.")
+
+
+class ConflictDetail(BaseModel):
+    """Programmatic warning detail regarding contradictory source statements."""
+    source_a: str = Field(description="Source document identifier or filename A.")
+    source_b: str = Field(description="Source document identifier or filename B.")
+    page_a: int = Field(default=1, description="Page number in document A.")
+    page_b: int = Field(default=1, description="Page number in document B.")
+    description: str = Field(description="Detailed text explaining the conflict/contradiction.")
+
+
+class RetrievalStats(BaseModel):
+    """Detailed performance metrics for the retrieval step."""
+    chunks_retrieved: int = Field(description="Number of chunks retrieved.")
+    search_time_ms: float = Field(description="Time spent searching in the vector database.")
+    rerank_time_ms: float = Field(default=0.0, description="Time spent reranking retrieved chunks.")
 
 
 class QueryResponse(BaseResponse):
@@ -117,32 +181,122 @@ class QueryResponse(BaseResponse):
         description="Unique identifier for this query execution.",
         examples=["qry_f7e8d9c0b1a2"],
     )
-    answer: str = Field(
-        description="LLM-generated answer grounded in retrieved chunks.",
-        examples=["Q3 2024 revenue grew 18% YoY, primarily driven by SaaS."],
+    query: str = Field(
+        description="Normalized query string executed against the retrieval pipeline.",
+        examples=["What were the key revenue drivers in Q3 2024?"],
     )
     status: QueryStatus = Field(
-        description="Resolution quality of the answer.",
-    )
-    confidence: float = Field(
-        ge=0.0,
-        le=1.0,
-        description="Aggregate confidence score across retrieved chunks (0 – 1).",
-        examples=[0.82],
+        description="Resolution quality of the query.",
     )
     retrieved_chunks: list[RetrievedChunk] = Field(
         default_factory=list,
-        description="Ordered list of context chunks used to generate the answer.",
+        description="Ordered list of context chunks retrieved for the query.",
+    )
+    chunk_count: int = Field(
+        ge=0,
+        description="Number of chunks returned in retrieved_chunks.",
+        examples=[3],
     )
     latency_ms: float = Field(
         ge=0.0,
-        description="Total wall-clock time for retrieval + generation in milliseconds.",
+        description="Total wall-clock time for retrieval in milliseconds.",
         examples=[420.5],
+    )
+    answer: str = Field(
+        default="",
+        description="LLM-generated answer grounded in retrieved chunks.",
+        examples=["Q3 2024 revenue grew 18% YoY, primarily driven by SaaS."],
+    )
+    confidence: float = Field(
+        default=0.0,
+        description="Blended confidence score from retrieval and evidence verification.",
+        examples=[0.85],
+    )
+    evidence_score: float = Field(
+        default=0.0,
+        ge=0.0,
+        le=1.0,
+        description="Lexical evidence score measuring answer support in retrieved chunks.",
+        examples=[0.82],
+    )
+    grounding_score: float = Field(
+        default=0.0,
+        ge=0.0,
+        le=1.0,
+        description="Blended lexical and semantic grounding score.",
+        examples=[0.81],
+    )
+    citations: list[Citation] = Field(
+        default_factory=list,
+        description="List of source citations attributing the generated answer.",
+    )
+    retrieval_stats: Optional[RetrievalStats] = Field(
+        default=None,
+        description="Detailed performance metrics for retrieval.",
+    )
+    grounded: bool = Field(
+        default=False,
+        description="Whether the generated answer is supported by retrieved evidence.",
+    )
+    verification_reason: str = Field(
+        default="",
+        description="Human-readable explanation of the verification outcome.",
+        examples=["Answer is supported by retrieved chunks."],
+    )
+    conversation_title: str = Field(
+        default="",
+        description="Automatically generated 2-4 word title for this conversation.",
+    )
+    retrieval_time_ms: float = Field(
+        default=0.0,
+        description="Time spent retrieving document context in milliseconds.",
+    )
+    generation_time_ms: float = Field(
+        default=0.0,
+        description="Time spent generating answer in milliseconds.",
+    )
+    verification_time_ms: float = Field(
+        default=0.0,
+        description="Time spent verifying answer in milliseconds.",
+    )
+    embedding_model: str = Field(
+        default="",
+        description="Name of the embedding model used.",
+    )
+    llm_model: str = Field(
+        default="",
+        description="Name of the LLM model used.",
+    )
+    semantic_similarity: float = Field(
+        default=0.0,
+        description="Max semantic similarity score between answer and sources.",
+    )
+    lexical_overlap: float = Field(
+        default=0.0,
+        description="Lexical overlap score between answer and sources.",
+    )
+    consensus_score: float = Field(
+        default=0.0,
+        description="Consensus score between retrieved chunks.",
+    )
+    claims: list[ClaimVerification] = Field(
+        default_factory=list,
+        description="Claim-level grounding details.",
+    )
+    conflicts: list[ConflictDetail] = Field(
+        default_factory=list,
+        description="List of contradictions or conflicts discovered between chunks.",
     )
 
     @model_validator(mode="after")
     def _clamp_confidence_on_failed(self) -> "QueryResponse":
         """Confidence must be 0 when status is FAILED — enforced at model level."""
-        if self.status == QueryStatus.FAILED:
+        if self.status in {QueryStatus.FAILED, QueryStatus.NO_RESULTS}:
             self.confidence = 0.0
+            self.evidence_score = 0.0
+            self.grounding_score = 0.0
+            self.grounded = False
+            self.citations = []
+            self.claims = []
+            self.conflicts = []
         return self

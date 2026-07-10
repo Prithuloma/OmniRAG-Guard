@@ -2,20 +2,26 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from app.services.ingestion.chunking import Chunk, ChunkingService
+from app.services.chunking.chunk_models import ChunkingResult
+from app.services.chunking.text_chunker import TextChunker
+from app.services.embeddings.embedding_models import EmbeddingResult
+from app.services.embeddings.embedding_service import EmbeddingService
 from app.services.ingestion.file_validator import FileValidator, ValidationResult
 from app.services.ingestion.parser_dispatcher import (
     ParserDispatchResult,
     ParserDispatcher,
     ParserDispatchStatus,
 )
+from app.services.ingestion.parsers.base_parser import ParseResult
 
 
 @dataclass(frozen=True, slots=True)
 class IngestionPipelineResult:
     validations: list[ValidationResult]
     dispatch: ParserDispatchResult | None
-    chunks: list[Chunk]
+    parsed: ParseResult | None
+    chunking: ChunkingResult | None
+    embeddings: EmbeddingResult | None
 
 
 class IngestionPipeline:
@@ -24,11 +30,13 @@ class IngestionPipeline:
         *,
         validator: FileValidator | None = None,
         parser: ParserDispatcher | None = None,
-        chunker: ChunkingService | None = None,
+        chunker: TextChunker | None = None,
+        embedder: EmbeddingService | None = None,
     ) -> None:
         self._validator = validator or FileValidator()
         self._parser = parser or ParserDispatcher()
-        self._chunker = chunker or ChunkingService()
+        self._chunker = chunker or TextChunker()
+        self._embedder = embedder or EmbeddingService()
 
     async def ingest(
         self,
@@ -45,7 +53,13 @@ class IngestionPipeline:
             self._validator.validate_file_size(num_bytes=len(data)),
         ]
         if not all(v.ok for v in validations):
-            return IngestionPipelineResult(validations=validations, dispatch=None, chunks=[])
+            return IngestionPipelineResult(
+                validations=validations,
+                dispatch=None,
+                parsed=None,
+                chunking=None,
+                embeddings=None,
+            )
 
         # ------------------------------------------------------------------ #
         # 2. Dispatch parser
@@ -56,25 +70,51 @@ class IngestionPipeline:
             data=data,
         )
 
-        if dispatch_result.status is not ParserDispatchStatus.SELECTED:
+        if (
+            dispatch_result.status is not ParserDispatchStatus.SELECTED
+            or dispatch_result.parser is None
+        ):
             return IngestionPipelineResult(
                 validations=validations,
                 dispatch=dispatch_result,
-                chunks=[],
+                parsed=None,
+                chunking=None,
+                embeddings=None,
             )
 
-        # Future PDF parser — invoked when parser_type == ParserType.PDF
-        # Future image parser — invoked when parser_type == ParserType.IMAGE
-        # Future text parser — invoked when parser_type == ParserType.TEXT
+        # ------------------------------------------------------------------ #
+        # 3. Parse
+        # ------------------------------------------------------------------ #
+        parse_result = await dispatch_result.parser.parse(
+            filename=filename,
+            content_type=content_type,
+            data=data,
+        )
 
         # ------------------------------------------------------------------ #
-        # 3. Placeholder chunking
+        # 4. Chunk
         # ------------------------------------------------------------------ #
-        chunks = await self._chunker.chunk(dispatch=dispatch_result)
+        chunking_result = self._chunker.chunk_text(
+            text=parse_result.extracted_text,
+            document_id=filename,
+            metadata={
+                "file_name": filename,
+                "content_type": content_type,
+                "parser_type": parse_result.parser_type.value,
+                "parse_status": parse_result.status.value,
+            },
+        )
+
+        # ------------------------------------------------------------------ #
+        # 5. Embed
+        # ------------------------------------------------------------------ #
+        embedding_result = await self._embedder.embed_chunks(chunking_result.chunks)
         return IngestionPipelineResult(
             validations=validations,
             dispatch=dispatch_result,
-            chunks=chunks,
+            parsed=parse_result,
+            chunking=chunking_result,
+            embeddings=embedding_result,
         )
 
     async def run(
