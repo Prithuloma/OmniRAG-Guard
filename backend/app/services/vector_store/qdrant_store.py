@@ -49,12 +49,14 @@ class QdrantStore:
         url: str | None = None,
         collection_name: str | None = None,
         vector_dimension: int | None = None,
+        api_key: str | None = None,
         client: QdrantClient | None = None,
     ) -> None:
         from app.core.config import settings
         self._url = url or settings.QDRANT_URL
         self._collection_name = collection_name or settings.QDRANT_COLLECTION_NAME
         self._vector_dimension = vector_dimension or settings.EMBEDDING_DIMENSION
+        self._api_key = api_key or settings.QDRANT_API_KEY
         self._client = client
 
     @property
@@ -71,7 +73,7 @@ class QdrantStore:
 
         try:
             # 1. Try remote connection with small timeout check
-            client = QdrantClient(url=self._url, timeout=1.0)
+            client = QdrantClient(url=self._url, api_key=self._api_key, timeout=1.0)
             client.get_collections()
             self._client = client
             return self._client

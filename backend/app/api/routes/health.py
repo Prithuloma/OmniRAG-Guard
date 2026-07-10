@@ -23,7 +23,11 @@ async def health_check() -> JSONResponse:
     
     # 1. Verify Qdrant connection
     try:
-        client = QdrantClient(url=settings.QDRANT_URL, timeout=1.0)
+        client = QdrantClient(
+            url=settings.QDRANT_URL,
+            api_key=settings.QDRANT_API_KEY,
+            timeout=1.0
+        )
         client.get_collections()
         health_status["services"]["qdrant"] = "healthy (remote)"
     except Exception as exc:
